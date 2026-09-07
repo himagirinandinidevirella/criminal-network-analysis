@@ -1,0 +1,166 @@
+/* CrimeNet AI — global styles + Tailwind layers
+   "Classified dossier" system: warm paper, ink, vermilion seal. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #f5f1e8;
+  --paper-raised: #fcfaf5;
+  --paper-sunk: #ece5d6;
+  --paper-line: #ddd5c2;
+  --ink: #1b2530;
+  --ink-soft: #4e5863;
+  --ink-faint: #8a8f8b;
+  --seal: #c13b26;
+  --seal-dark: #9e2f1d;
+  --seal-soft: #f4e0da;
+  --teal: #17645b;
+  --risk-critical: #b3261e;
+  --risk-high: #c0551f;
+  --risk-medium: #9a6a12;
+  --risk-low: #1e7a55;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: "Public Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--seal-soft);
+  color: var(--seal-dark);
+}
+
+/* ── Scrollbars ─────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d3c9b4;
+  border-radius: 6px;
+  border: 2px solid var(--paper);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b9ad92;
+}
+
+/* ── Dossier card (replaces the old blue glassmorphism) ──── */
+.glass {
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-line);
+  box-shadow: 0 1px 2px rgba(27, 37, 48, 0.05),
+    0 10px 28px -12px rgba(27, 37, 48, 0.18);
+}
+
+/* ── Dossier motif utilities ─────────────────────────────── */
+.dossier-title {
+  font-family: "Source Serif 4", Georgia, serif;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.stamp {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--seal);
+  border: 1.5px solid var(--seal);
+  padding: 2px 8px;
+  border-radius: 3px;
+  transform: rotate(-2deg);
+  background: rgba(193, 59, 38, 0.04);
+}
+
+.stamp--muted {
+  color: var(--ink-faint);
+  border-color: var(--paper-line);
+  background: transparent;
+  transform: none;
+}
+
+.file-rule {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--paper-line) 0%,
+    var(--paper-line) 70%,
+    transparent 100%
+  );
+}
+
+.paper-grain {
+  background-image: radial-gradient(
+      rgba(27, 37, 48, 0.035) 1px,
+      transparent 1px
+    );
+  background-size: 22px 22px;
+}
+
+/* ── Risk helpers (kept for any inline CSS usage) ────────── */
+.risk-critical-text {
+  color: var(--risk-critical);
+}
+.risk-high-text {
+  color: var(--risk-high);
+}
+.risk-medium-text {
+  color: var(--risk-medium);
+}
+.risk-low-text {
+  color: var(--risk-low);
+}
+
+/* ── Cytoscape canvas sizing ────────────────────────────── */
+.cy-container {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+}
+
+/* ── Leaflet light tweaks ───────────────────────────────── */
+.leaflet-container {
+  background: #e8e2d3;
+  font-family: "Public Sans", system-ui, sans-serif;
+}
+
+/* ── Quill editor light theme ───────────────────────────── */
+.ql-toolbar.ql-snow,
+.ql-container.ql-snow {
+  border-color: var(--paper-line) !important;
+  background: var(--paper-raised);
+}
+.ql-toolbar.ql-snow .ql-stroke {
+  stroke: var(--ink-soft);
+}
+.ql-toolbar.ql-snow .ql-fill {
+  fill: var(--ink-soft);
+}
+.ql-editor {
+  min-height: 120px;
+  color: var(--ink);
+}
+
+/* ── Accessibility focus ring ───────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--seal);
+  outline-offset: 2px;
+}
