@@ -1,7 +1,11 @@
 /**
  * Alert state slice — active alerts, real-time additions, stats.
  */
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  createAsyncThunk,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import { get } from "@/services/api";
 import type { Alert, AlertStats } from "@/types/alert.types";
 
@@ -23,12 +27,11 @@ const initialState: AlertState = {
 
 export const fetchActiveAlerts = createAsyncThunk(
   "alerts/fetchActive",
-  async () => get<Alert[]>("/api/alerts/active")
+  async () => get<Alert[]>("/api/alerts/active"),
 );
 
-export const fetchAlertStats = createAsyncThunk(
-  "alerts/fetchStats",
-  async () => get<AlertStats>("/api/alerts/statistics")
+export const fetchAlertStats = createAsyncThunk("alerts/fetchStats", async () =>
+  get<AlertStats>("/api/alerts/statistics"),
 );
 
 const alertSlice = createSlice({
@@ -48,10 +51,12 @@ const alertSlice = createSlice({
     builder
       .addCase(fetchActiveAlerts.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(fetchActiveAlerts.fulfilled, (state, action) => {
         state.loading = false;
         state.active = action.payload;
+        state.error = null;
       })
       .addCase(fetchActiveAlerts.rejected, (state, action) => {
         state.loading = false;

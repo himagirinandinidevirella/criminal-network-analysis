@@ -26,6 +26,10 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+      "/health": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
       "/docs": {
         target: "http://localhost:8000",
         changeOrigin: true,
@@ -36,6 +40,7 @@ export default defineConfig({
       },
     },
   },
+  preview: { host: "0.0.0.0", port: 3000, allowedHosts: true },
   build: {
     outDir: "dist",
     sourcemap: false,

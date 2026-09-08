@@ -1,113 +1,157 @@
-/**
- * GeographicHeatmap — Leaflet map of India with crime hotspots.
- */
+/** Local coordinate view by default; the optional OSM layer requires internet. */
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+  Tooltip,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { get } from "@/services/api";
-import type { NetworkStatistics } from "@/types/network.types";
+import { IS_DEMO } from "@/config/runtime";
+import { fetchHotspots, type Hotspot } from "@/services/geography";
+import CrimeHotspots from "./CrimeHotspots";
 
-interface Hotspot {
-  id: string;
-  name: string;
-  city: string;
-  state: string;
-  latitude: number;
-  longitude: number;
-  hotspot_score: number;
-  crime_count: number;
-}
-
-// Fallback city coordinates (India) used before the backend responds.
-const FALLBACK: Hotspot[] = [
-  { id: "mum", name: "Mumbai", city: "Mumbai", state: "Maharashtra", latitude: 19.076, longitude: 72.8777, hotspot_score: 0.92, crime_count: 38 },
-  { id: "del", name: "Delhi", city: "Delhi", state: "Delhi", latitude: 28.6139, longitude: 77.209, hotspot_score: 0.84, crime_count: 31 },
-  { id: "che", name: "Chennai", city: "Chennai", state: "Tamil Nadu", latitude: 13.0827, longitude: 80.2707, hotspot_score: 0.71, crime_count: 22 },
-  { id: "kol", name: "Kolkata", city: "Kolkata", state: "West Bengal", latitude: 22.5726, longitude: 88.3639, hotspot_score: 0.66, crime_count: 20 },
-  { id: "hyd", name: "Hyderabad", city: "Hyderabad", state: "Telangana", latitude: 17.385, longitude: 78.4867, hotspot_score: 0.5, crime_count: 14 },
-  { id: "bgl", name: "Bengaluru", city: "Bengaluru", state: "Karnataka", latitude: 12.9716, longitude: 77.5946, hotspot_score: 0.45, crime_count: 12 },
+const FILTERS = [
+  "All",
+  "Drug Trafficking",
+  "Money Laundering",
+  "Cyber Crime",
+  "Extortion",
+  "Robbery",
 ];
-
-function hotspotColor(score: number): string {
-  if (score >= 0.75) return "#B3261E";
-  if (score >= 0.5) return "#C0551F";
-  if (score >= 0.3) return "#9A6A12";
-  return "#1E7A55";
-}
-
+const color = (score: number) =>
+  score >= 0.75 ? "#B3261E" : score >= 0.5 ? "#C0551F" : "#9A6A12";
 export default function GeographicHeatmap() {
-  const [hotspots, setHotspots] = useState<Hotspot[]>(FALLBACK);
-  const [filter, setFilter] = useState("ALL");
-
+  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [filter, setFilter] = useState("All");
+  const [basemap, setBasemap] = useState(!IS_DEMO);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   useEffect(() => {
-    // Stats endpoint gives crime types; locations come from fallback for demo.
-    get<NetworkStatistics>("/api/network/statistics")
-      .then((stats) => {
-        if (stats?.crime_types?.length) {
-          // No-op: we keep city fallbacks; in production this is the locations endpoint.
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    fetchHotspots(filter === "All" ? "" : filter)
+      .then((data) => {
+        if (!cancelled) setHotspots(data.filter((h) => h.crime_count > 0));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(
+            "Could not load locations. Please check the data connection.",
+          );
+          setHotspots([]);
         }
       })
-      .catch(() => {});
-  }, []);
-
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filter]);
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Geographic Crime Map</h1>
-        <p className="text-sm text-text-secondary">Heatmap of criminal activity across India</p>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Geographic Crime Map
+        </h1>
+        <p className="mt-1 text-sm text-ink-soft">
+          {IS_DEMO
+            ? "Fictional case locations — not a real crime heatmap. Marker size reflects sample case counts."
+            : "Location records from the knowledge graph."}
+        </p>
       </div>
-
       <div className="flex flex-wrap gap-2">
-        {["ALL", "DRUG", "CYBER", "ROBBERY", "TRAFFICKING"].map((f) => (
+        {FILTERS.map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              filter === f ? "border-seal bg-seal text-ink-onred" : "border-paper-line bg-paper-raised text-ink-soft hover:bg-paper-sunk"
-            }`}
+            aria-pressed={f === filter}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${f === filter ? "border-seal bg-seal text-white" : "border-paper-line text-ink-soft hover:bg-paper-sunk"}`}
           >
             {f}
           </button>
         ))}
       </div>
-
-      <div className="glass overflow-hidden rounded-2xl">
-        <MapContainer
-          center={[22.5, 79]}
-          zoom={5}
-          style={{ height: "560px", width: "100%" }}
-          scrollWheelZoom
-        >
-          <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      <div className="flex flex-wrap justify-between gap-2 text-xs text-ink-soft">
+        <p role="status">
+          {loading
+            ? "Updating locations…"
+            : `${hotspots.reduce((sum, h) => sum + h.crime_count, 0)} case records across ${hotspots.length} locations`}
+        </p>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={basemap}
+            onChange={(e) => setBasemap(e.target.checked)}
+            className="accent-seal"
           />
-          {hotspots.map((h) => (
-            <CircleMarker
-              key={h.id}
-              center={[h.latitude, h.longitude]}
-              radius={8 + h.hotspot_score * 22}
-              pathOptions={{
-                color: hotspotColor(h.hotspot_score),
-                fillColor: hotspotColor(h.hotspot_score),
-                fillOpacity: 0.55,
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -8]}>
-                {h.name}
-              </Tooltip>
-              <Popup>
-                <div style={{ fontSize: 12 }}>
-                  <strong>{h.name}</strong>
-                  <br />
-                  Hotspot score: {(h.hotspot_score * 100).toFixed(0)}
-                  <br />
-                  Crime events: {h.crime_count}
-                </div>
-              </Popup>
-            </CircleMarker>
-          ))}
-        </MapContainer>
+          OpenStreetMap basemap (requires internet)
+        </label>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-risk-critical">
+          {error}
+        </p>
+      )}
+      <div className="grid gap-4 xl:grid-cols-4">
+        <div className="glass overflow-hidden rounded-2xl xl:col-span-3">
+          <MapContainer
+            center={[22.5, 79]}
+            zoom={5}
+            style={{
+              height: "520px",
+              width: "100%",
+              backgroundImage: "radial-gradient(#cfc5b0 1px, transparent 1px)",
+              backgroundSize: "22px 22px",
+            }}
+            scrollWheelZoom
+          >
+            {basemap && (
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            )}
+            {hotspots.map((h) => (
+              <CircleMarker
+                key={h.id}
+                center={[h.latitude, h.longitude]}
+                radius={8 + h.hotspot_score * 16}
+                pathOptions={{
+                  color: color(h.hotspot_score),
+                  fillColor: color(h.hotspot_score),
+                  fillOpacity: 0.55,
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -8]} permanent={!basemap}>
+                  {h.city || h.name}
+                </Tooltip>
+                <Popup>
+                  <div className="text-xs">
+                    <strong>{h.name}</strong>
+                    <p>
+                      {IS_DEMO ? "Synthetic case records" : "Crime records"}:{" "}
+                      {h.crime_count}
+                    </p>
+                    <p>
+                      {h.latitude.toFixed(3)}° N, {h.longitude.toFixed(3)}° E
+                    </p>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            ))}
+          </MapContainer>
+          {!basemap && (
+            <p className="border-t border-paper-line px-4 py-2 text-[11px] text-ink-soft">
+              Offline coordinate view · drag to pan, +/− to zoom · basemap
+              optional
+            </p>
+          )}
+        </div>
+        <CrimeHotspots hotspots={hotspots} />
       </div>
     </div>
   );

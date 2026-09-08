@@ -1,3 +1,5 @@
+import ErrorState from "@/components/Common/ErrorState";
+import { useSearchParams } from "react-router-dom";
 /**
  * Network Analysis page — the core interactive criminal network explorer.
  */
@@ -11,12 +13,25 @@ import PathFinder from "@/components/NetworkGraph/PathFinder";
 import CommunityView from "@/components/NetworkGraph/CommunityView";
 import WhatIfSimulator from "@/components/NetworkGraph/WhatIfSimulator";
 import { registerGraphExtensions } from "@/hooks/useNetworkGraph";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/Common/Tabs";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/Common/Tabs";
 
 export default function NetworkAnalysis() {
   const dispatch = useDispatch<AppDispatch>();
   const graph = useSelector((state: RootState) => state.network.graph);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const error = useSelector((state: RootState) => state.network.error);
+  const [params] = useSearchParams();
+  const loading = useSelector((state: RootState) => state.network.loading);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
+    params.get("node"),
+  );
+  useEffect(() => {
+    setSelectedNodeId(params.get("node"));
+  }, [params]);
   const filtersRef = useRef<Record<string, unknown>>({});
 
   useEffect(() => {
@@ -35,15 +50,24 @@ export default function NetworkAnalysis() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Network Analysis</h1>
         <p className="text-sm text-text-secondary">
-          Interactive knowledge graph of persons, organizations, vehicles, accounts &amp; locations
+          Interactive knowledge graph of persons, organizations, vehicles,
+          accounts &amp; locations
         </p>
       </div>
 
+      {error && (
+        <ErrorState
+          message={error}
+          onRetry={() => dispatch(fetchFullGraph(filtersRef.current))}
+        />
+      )}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         {/* Graph canvas */}
         <div className="xl:col-span-3">
           <CriminalNetworkMap
             graph={graph}
+            loading={loading}
+            selectedNodeId={selectedNodeId}
             onNodeSelect={setSelectedNodeId}
             onFilterChange={handleFilterChange}
           />

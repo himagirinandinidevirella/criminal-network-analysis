@@ -6,9 +6,13 @@ import { Play, Pause, SkipForward, X, ShieldCheck } from "lucide-react";
 import { useDemo } from "@/hooks/useDemoMode";
 
 export default function DemoOverlay() {
-  const { active, stepIndex, paused, steps, togglePause, next, exit } = useDemo();
+  const { active, stepIndex, paused, steps, togglePause, next, exit } =
+    useDemo();
   const step = steps[stepIndex];
   const progress = ((stepIndex + 1) / steps.length) * 100;
+  // The provider exits after advancing beyond the last step. Do not render an
+  // undefined step during that final render before its effect runs.
+  if (!active || !step) return null;
 
   return (
     <AnimatePresence>
@@ -35,14 +39,19 @@ export default function DemoOverlay() {
                   aria-label={paused ? "Resume demo" : "Pause demo"}
                   title={paused ? "Resume" : "Pause"}
                 >
-                  {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                  {paused ? (
+                    <Play className="h-3.5 w-3.5" />
+                  ) : (
+                    <Pause className="h-3.5 w-3.5" />
+                  )}
                 </button>
                 <button
                   onClick={next}
                   className="flex items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-[11px] font-semibold text-text-secondary transition hover:bg-bg-hover"
                   title="Skip to next step"
                 >
-                  <SkipForward className="h-3.5 w-3.5" /> Next
+                  <SkipForward className="h-3.5 w-3.5" />{" "}
+                  {stepIndex === steps.length - 1 ? "Finish" : "Next"}
                 </button>
                 <button
                   onClick={exit}
@@ -74,8 +83,8 @@ export default function DemoOverlay() {
                     i < stepIndex
                       ? "w-4 bg-accent-blue"
                       : i === stepIndex
-                      ? "w-6 bg-accent-cyan"
-                      : "w-1.5 bg-bg-hover"
+                        ? "w-6 bg-accent-cyan"
+                        : "w-1.5 bg-bg-hover"
                   }`}
                 />
               ))}

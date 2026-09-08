@@ -1,3 +1,7 @@
+import { IS_DEMO } from "@/config/runtime";
+import { triggerDemoAlert } from "@/services/demoService";
+import { enableBrowserNotifications } from "@/services/preferences";
+import { errorToast } from "@/components/Common/ToastNotification";
 /**
  * AlertDashboard — alert list with filters, real-time updates and stats panel.
  */
@@ -22,6 +26,8 @@ export default function AlertDashboard() {
   const loading = useSelector((state: RootState) => state.alerts.loading);
   const [filter, setFilter] = useState<Filter>("ALL");
   const [showRules, setShowRules] = useState(false);
+  const [triggering, setTriggering] = useState(false);
+  const error = useSelector((state: RootState) => state.alerts.error);
 
   useEffect(() => {
     dispatch(fetchActiveAlerts());
@@ -29,12 +35,10 @@ export default function AlertDashboard() {
     alertSocket.connect();
   }, [dispatch]);
 
-  // Flash/sound/toast on new critical alerts.
-  useRealTimeAlerts();
-
   const filtered = useMemo(
-    () => (filter === "ALL" ? alerts : alerts.filter((a) => a.severity === filter)),
-    [alerts, filter]
+    () =>
+      filter === "ALL" ? alerts : alerts.filter((a) => a.severity === filter),
+    [alerts, filter],
   );
 
   const counts = useMemo(() => {
@@ -47,23 +51,55 @@ export default function AlertDashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
             <BellRing className="h-6 w-6 text-risk-critical" /> Alerts
           </h1>
           <p className="text-sm text-text-secondary">
-            Total: {alerts.length} · Critical: {counts.CRITICAL} · High: {counts.HIGH} · Medium: {counts.MEDIUM}
+            Total: {alerts.length} · Critical: {counts.CRITICAL} · High:{" "}
+            {counts.HIGH} · Medium: {counts.MEDIUM}
           </p>
         </div>
-        <button
-          onClick={() => setShowRules((s) => !s)}
-          className="flex items-center gap-2 rounded-lg bg-accent-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-seal-dark"
-        >
-          <Plus className="h-4 w-4" /> Create Rule
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {IS_DEMO && (
+            <button
+              disabled={triggering}
+              onClick={async () => {
+                setTriggering(true);
+                try {
+                  await triggerDemoAlert();
+                } catch {
+                  errorToast("Could not trigger a demo alert");
+                } finally {
+                  setTriggering(false);
+                }
+              }}
+              className="rounded-lg border border-teal/40 bg-teal-soft px-4 py-2 text-sm font-semibold text-teal disabled:opacity-50"
+            >
+              {triggering ? "Triggering…" : "Trigger demo alert"}
+            </button>
+          )}
+          <button
+            onClick={() => setShowRules((s) => !s)}
+            className="flex items-center gap-2 rounded-lg bg-accent-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-seal-dark"
+          >
+            <Plus className="h-4 w-4" /> Create Rule
+          </button>
+        </div>
       </div>
 
+      {IS_DEMO && (
+        <p className="text-xs text-teal">
+          Synthetic events only. Triggering an alert uses a local event bus; no
+          live monitoring stream is connected.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-risk-critical">
+          {error}
+        </p>
+      )}
       {showRules && <AlertRulesManager onClose={() => setShowRules(false)} />}
 
       {/* Filters */}
@@ -73,7 +109,9 @@ export default function AlertDashboard() {
             key={f}
             onClick={() => setFilter(f)}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              filter === f ? "border-seal bg-seal text-ink-onred" : "border-paper-line bg-paper-raised text-ink-soft hover:bg-paper-sunk"
+              filter === f
+                ? "border-seal bg-seal text-ink-onred"
+                : "border-paper-line bg-paper-raised text-ink-soft hover:bg-paper-sunk"
             }`}
           >
             {f} ({counts[f]})
@@ -104,33 +142,63 @@ export default function AlertDashboard() {
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-text-muted">Total alerts</dt>
-                <dd className="font-semibold">{stats?.total ?? alerts.length}</dd>
+                <dd className="font-semibold">
+                  {stats?.total ?? alerts.length}
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-text-muted">Critical</dt>
-                <dd className="font-semibold text-risk-critical">{stats?.critical ?? counts.CRITICAL}</dd>
+                <dd className="font-semibold text-risk-critical">
+                  {stats?.critical ?? counts.CRITICAL}
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-text-muted">High</dt>
-                <dd className="font-semibold text-risk-high">{stats?.high ?? counts.HIGH}</dd>
+                <dd className="font-semibold text-risk-high">
+                  {stats?.high ?? counts.HIGH}
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-text-muted">Medium</dt>
-                <dd className="font-semibold text-risk-medium">{stats?.medium ?? counts.MEDIUM}</dd>
+                <dd className="font-semibold text-risk-medium">
+                  {stats?.medium ?? counts.MEDIUM}
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-text-muted">Low</dt>
-                <dd className="font-semibold text-risk-low">{stats?.low ?? counts.LOW}</dd>
+                <dd className="font-semibold text-risk-low">
+                  {stats?.low ?? counts.LOW}
+                </dd>
               </div>
             </dl>
           </div>
 
           <div className="glass rounded-2xl p-4 text-xs text-text-secondary">
-            <h3 className="mb-2 text-sm font-semibold text-text-primary">SLA</h3>
-            <p>Avg response time: 4.2 min</p>
-            <p>Resolution rate: 87%</p>
+            <h3 className="mb-2 text-sm font-semibold text-text-primary">
+              Review workflow
+            </h3>
+            <p>
+              Open an alert to review its details, assign it to yourself,
+              escalate it or resolve it. Resolved alerts leave the active list.
+            </p>
             <button
-              onClick={() => successToast("Notification permissions requested")}
+              onClick={async () => {
+                try {
+                  const status = await enableBrowserNotifications();
+                  if (status === "granted")
+                    successToast("Browser notifications enabled");
+                  else
+                    errorToast(
+                      status === "unsupported"
+                        ? "This browser does not support notifications"
+                        : "Notifications were not enabled. Check your browser permissions.",
+                    );
+                } catch {
+                  errorToast(
+                    "Browser notifications are unavailable in this context",
+                  );
+                }
+              }}
               className="mt-3 w-full rounded-lg border border-border py-2 font-semibold transition hover:bg-bg-hover"
             >
               Enable browser notifications

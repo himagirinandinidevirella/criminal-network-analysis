@@ -1,7 +1,11 @@
 /**
  * Criminal state slice — search results, current profile, FIR analysis.
  */
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  createAsyncThunk,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import { get, post } from "@/services/api";
 import type {
   Criminal,
@@ -17,6 +21,7 @@ interface CriminalState {
   firResult: FIRAnalysisResult | null;
   loading: boolean;
   error: string | null;
+  profileRequestId: string | null;
 }
 
 const initialState: CriminalState = {
@@ -26,6 +31,7 @@ const initialState: CriminalState = {
   firResult: null,
   loading: false,
   error: null,
+  profileRequestId: null,
 };
 
 export const fetchCriminals = createAsyncThunk(
@@ -34,21 +40,21 @@ export const fetchCriminals = createAsyncThunk(
     const query = new URLSearchParams(
       Object.entries(params)
         .filter(([, v]) => v !== undefined && v !== null && v !== "")
-        .map(([k, v]) => [k, String(v)])
+        .map(([k, v]) => [k, String(v)]),
     );
     return get<Paginated<Criminal>>(`/api/criminals/?${query.toString()}`);
-  }
+  },
 );
 
 export const fetchProfile = createAsyncThunk(
   "criminal/fetchProfile",
-  async (id: string) => get<CriminalProfile>(`/api/criminals/${id}`)
+  async (id: string) => get<CriminalProfile>(`/api/criminals/${id}`),
 );
 
 export const analyzeFir = createAsyncThunk(
   "criminal/analyzeFir",
   async (payload: { fir_text: string; language: string }) =>
-    post<FIRAnalysisResult>("/api/criminals/analyze-fir", payload)
+    post<FIRAnalysisResult>("/api/criminals/analyze-fir", payload),
 );
 
 const criminalSlice = createSlice({
@@ -73,14 +79,20 @@ const criminalSlice = createSlice({
         state.loading = false;
         state.error = action.error.message ?? "Failed to load criminals";
       })
-      .addCase(fetchProfile.pending, (state) => {
+      .addCase(fetchProfile.pending, (state, action) => {
         state.loading = true;
+        state.error = null;
+        state.profileRequestId = action.meta.requestId;
+        if (state.current?.person.id !== action.meta.arg) state.current = null;
       })
       .addCase(fetchProfile.fulfilled, (state, action) => {
+        if (state.profileRequestId !== action.meta.requestId) return;
         state.loading = false;
         state.current = action.payload;
+        state.error = null;
       })
       .addCase(fetchProfile.rejected, (state, action) => {
+        if (state.profileRequestId !== action.meta.requestId) return;
         state.loading = false;
         state.error = action.error.message ?? "Failed to load profile";
       })

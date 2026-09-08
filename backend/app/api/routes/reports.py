@@ -11,6 +11,7 @@ GET  /api/reports/history        — list previously generated reports
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,7 +20,8 @@ from pydantic import BaseModel, Field
 
 from app.api.middleware.auth_middleware import get_current_user
 from app.api.routes import ok
-from app.database.postgres_connection import fetch_all
+from app.database.postgres_connection import fetch_all, fetch_one
+from app.config import settings
 from app.services import report_service
 
 logger = logging.getLogger("crimenet.reports")
@@ -36,14 +38,13 @@ class ReportRequest(BaseModel):
 
 
 def _serve(result: dict[str, Any], fmt: str) -> Any:
-    """Return a FileResponse for binary formats, JSON otherwise."""
-    if fmt == "JSON":
-        return ok(result)
+    """Return the generated file, including JSON reports (not server-path metadata)."""
     file_path = result.get("file_path")
     if not file_path:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Report generation failed")
     media = {
         "PDF": "application/pdf",
+        "JSON": "application/json",
         "CSV": "text/csv",
         "EXCEL": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }.get(fmt, "application/octet-stream")
@@ -97,3 +98,23 @@ async def history() -> dict[str, Any]:
     """List previously generated reports."""
     rows = fetch_all("SELECT * FROM report_history ORDER BY created_at DESC LIMIT 200")
     return ok(rows)
+
+
+@router.get("/{report_id}/download")
+async def download_report(report_id: str) -> Any:
+    """Download an existing authenticated report without exposing server paths."""
+    row = fetch_one(
+        "SELECT file_url, format FROM report_history WHERE id::text = %s LIMIT 1",
+        (report_id,),
+    )
+    if not row or not row.get("file_url"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Report file not found")
+    root = settings.report_storage_dir.resolve()
+    candidate = Path(row["file_url"]).resolve()
+    if not candidate.is_relative_to(root) or not candidate.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Report file not found")
+    media_type = {
+        "PDF": "application/pdf", "CSV": "text/csv", "JSON": "application/json",
+        "EXCEL": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }.get(str(row.get("format", "")).upper(), "application/octet-stream")
+    return FileResponse(candidate, filename=candidate.name, media_type=media_type)

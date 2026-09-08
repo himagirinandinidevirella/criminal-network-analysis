@@ -14,26 +14,51 @@ export interface ReportRequest {
 /** Generate + download a criminal profile report. */
 export async function downloadCriminalReport(
   criminalId: string,
-  body: ReportRequest
+  body: ReportRequest,
 ): Promise<void> {
-  const blob = await postDownload(`/api/reports/criminal/${criminalId}`, body);
-  triggerDownload(blob, `criminal_${criminalId}.${body.format.toLowerCase()}`);
+  const blob = await postDownload(
+    `/api/reports/criminal/${encodeURIComponent(criminalId)}`,
+    body,
+  );
+  triggerDownload(
+    blob,
+    `criminal_${criminalId}.${body.format === "EXCEL" ? "xlsx" : body.format.toLowerCase()}`,
+  );
 }
 
 /** Generate + download a network analysis report. */
-export async function downloadNetworkReport(body: ReportRequest): Promise<void> {
+export async function downloadNetworkReport(
+  body: ReportRequest,
+): Promise<void> {
   const blob = await postDownload("/api/reports/network", body);
-  triggerDownload(blob, `network_report.${body.format.toLowerCase()}`);
+  triggerDownload(
+    blob,
+    `network_report.${body.format === "EXCEL" ? "xlsx" : body.format.toLowerCase()}`,
+  );
 }
 
 /** Generate + download a case report. */
-export async function downloadCaseReport(caseId: string, body: ReportRequest): Promise<void> {
-  const blob = await postDownload(`/api/reports/case/${caseId}`, body);
-  triggerDownload(blob, `case_${caseId}.${body.format.toLowerCase()}`);
+export async function downloadCaseReport(
+  caseId: string,
+  body: ReportRequest,
+): Promise<void> {
+  const blob = await postDownload(
+    `/api/reports/case/${encodeURIComponent(caseId)}`,
+    body,
+  );
+  triggerDownload(
+    blob,
+    `case_${caseId}.${body.format === "EXCEL" ? "xlsx" : body.format.toLowerCase()}`,
+  );
 }
 
 /** Generate + download an executive summary. */
-export async function downloadExecutiveReport(body: ReportRequest): Promise<void> {
+export async function downloadExecutiveReport(
+  body: ReportRequest,
+): Promise<void> {
   const blob = await postDownload("/api/reports/executive", body);
-  triggerDownload(blob, `executive_summary.${body.format.toLowerCase()}`);
+  triggerDownload(
+    blob,
+    `executive_summary.${body.format === "EXCEL" ? "xlsx" : body.format.toLowerCase()}`,
+  );
 }

@@ -1,9 +1,14 @@
+import { SESSION_KEYS } from "@/config/runtime";
 /**
  * Auth state slice.
  */
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  createAsyncThunk,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import * as authService from "@/services/auth";
-import { clearSession } from "@/services/api";
+import { clearSession, apiErrorMessage } from "@/services/api";
 import type { LoginResponse, UserProfile } from "@/types/api.types";
 
 interface AuthState {
@@ -17,22 +22,22 @@ interface AuthState {
 const initialState: AuthState = {
   user: authService.getStoredUser(),
   role: authService.getStoredUser()?.role ?? null,
-  token: localStorage.getItem("crimenet_access_token"),
+  token: localStorage.getItem(SESSION_KEYS.access),
   loading: false,
   error: null,
 };
 
 /** Async login thunk. */
-export const loginThunk = createAsyncThunk<LoginResponse, authService.LoginPayload>(
-  "auth/login",
-  async (payload, { rejectWithValue }) => {
-    try {
-      return await authService.login(payload);
-    } catch (err) {
-      return rejectWithValue((err as Error).message || "Login failed");
-    }
+export const loginThunk = createAsyncThunk<
+  LoginResponse,
+  authService.LoginPayload
+>("auth/login", async (payload, { rejectWithValue }) => {
+  try {
+    return await authService.login(payload);
+  } catch (err) {
+    return rejectWithValue(apiErrorMessage(err));
   }
-);
+});
 
 const authSlice = createSlice({
   name: "auth",

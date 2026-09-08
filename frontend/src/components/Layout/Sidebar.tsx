@@ -1,3 +1,5 @@
+import { IS_DEMO } from "@/config/runtime";
+import { alertSocket } from "@/services/websocket";
 /**
  * Sidebar — primary navigation.
  * "Classified dossier" styling: paper, serif brand, vermilion active rule.
@@ -6,13 +8,34 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  LayoutDashboard, Network, Search, Bell, FileBarChart, Map as MapIcon,
-  Bot, Settings, LogOut, ChevronLeft, ChevronRight, Shield, Link2, BookOpen,
+  LayoutDashboard,
+  Network,
+  Search,
+  Bell,
+  FileBarChart,
+  Map as MapIcon,
+  Bot,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  Link2,
+  BookOpen,
+  Fingerprint,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { logout } from "@/store/authSlice";
 
-const NAV_SECTIONS: Array<{ label: string; items: Array<{ to: string; label: string; icon: typeof LayoutDashboard; end?: boolean }> }> = [
+const NAV_SECTIONS: Array<{
+  label: string;
+  items: Array<{
+    to: string;
+    label: string;
+    icon: typeof LayoutDashboard;
+    end?: boolean;
+  }>;
+}> = [
   {
     label: "Operations",
     items: [
@@ -26,8 +49,21 @@ const NAV_SECTIONS: Array<{ label: string; items: Array<{ to: string; label: str
     label: "Analysis",
     items: [
       { to: "/network", label: "Network Analysis", icon: Network },
-      { to: "/blockchain", label: "Blockchain", icon: Link2 },
-      { to: "/chat", label: "AI Assistant", icon: Bot },
+      {
+        to: "/fingerprints",
+        label: "Fingerprint verification",
+        icon: Fingerprint,
+      },
+      {
+        to: "/blockchain",
+        label: IS_DEMO ? "Integrity Lab" : "Blockchain",
+        icon: Link2,
+      },
+      {
+        to: "/chat",
+        label: IS_DEMO ? "Demo Assistant" : "AI Assistant",
+        icon: Bot,
+      },
     ],
   },
   {
@@ -36,21 +72,30 @@ const NAV_SECTIONS: Array<{ label: string; items: Array<{ to: string; label: str
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({
+  mobileOpen,
+  onClose,
+}: {
+  mobileOpen: boolean;
+  onClose: () => void;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.auth.user);
-  const alertCount = useSelector((state: RootState) => state.alerts.active.length);
+  const alertCount = useSelector(
+    (state: RootState) => state.alerts.active.length,
+  );
 
   const handleLogout = () => {
+    alertSocket.disconnect();
     dispatch(logout());
     navigate("/login");
   };
 
   return (
     <aside
-      className={`flex h-full flex-col border-r border-paper-line bg-paper-raised transition-all duration-200 ${
+      className={`fixed inset-y-0 left-0 z-40 flex h-full shrink-0 flex-col border-r border-paper-line bg-paper-raised transition-all duration-200 lg:static lg:visible lg:translate-x-0 ${mobileOpen ? "visible translate-x-0" : "invisible -translate-x-full"} ${
         collapsed ? "w-[68px]" : "w-64"
       }`}
       aria-label="Primary navigation"
@@ -66,7 +111,7 @@ export default function Sidebar() {
               CrimeNet
             </div>
             <div className="font-mono text-[10px] uppercase tracking-widest text-ink-faint">
-              Ministry of Home Affairs
+              {IS_DEMO ? "Synthetic demo" : "Ministry of Home Affairs"}
             </div>
           </div>
         )}
@@ -78,6 +123,8 @@ export default function Sidebar() {
         <div>
           <NavLink
             to="/overview"
+            onClick={onClose}
+            aria-label="Project overview"
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-md border px-3 py-2.5 text-sm font-semibold transition ${
                 isActive
@@ -111,6 +158,8 @@ export default function Sidebar() {
                 <NavLink
                   key={to}
                   to={to}
+                  aria-label={label}
+                  onClick={onClose}
                   end={end}
                   className={({ isActive }) =>
                     `group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition ${
@@ -148,17 +197,23 @@ export default function Sidebar() {
       <div className="border-t border-paper-line p-3">
         {!collapsed ? (
           <div className="mb-2 rounded-md border border-paper-line bg-paper-sunk px-3 py-2.5">
-            <div className="truncate font-mono text-sm font-semibold">{user?.name ?? "Officer"}</div>
+            <div className="truncate font-mono text-sm font-semibold">
+              {user?.name ?? "Officer"}
+            </div>
             <div className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
               {user?.role ?? "—"}
             </div>
             <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[10px] text-risk-low">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-risk-low" /> ONLINE
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-risk-low" />{" "}
+              ONLINE
             </div>
           </div>
         ) : (
           <div className="mb-2 flex justify-center">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-risk-low" title="Online" />
+            <span
+              className="h-2.5 w-2.5 animate-pulse rounded-full bg-risk-low"
+              title="Online"
+            />
           </div>
         )}
         <div className="flex items-center gap-1">
@@ -172,10 +227,14 @@ export default function Sidebar() {
           </button>
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className="rounded-md border border-paper-line p-2 text-ink-soft transition hover:bg-paper-sunk"
+            className="hidden rounded-md border border-paper-line p-2 text-ink-soft transition hover:bg-paper-sunk lg:block"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>

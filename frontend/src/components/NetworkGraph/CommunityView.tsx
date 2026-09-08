@@ -1,3 +1,4 @@
+import { IS_DEMO } from "@/config/runtime";
 /**
  * CommunityView — list detected gangs/networks (Louvain communities).
  */
@@ -10,7 +11,9 @@ import LoadingSkeleton from "@/components/Common/LoadingSkeleton";
 
 export default function CommunityView() {
   const dispatch = useDispatch<AppDispatch>();
-  const communities = useSelector((state: RootState) => state.network.communities);
+  const communities = useSelector(
+    (state: RootState) => state.network.communities,
+  );
   const loading = useSelector((state: RootState) => state.network.loading);
 
   useEffect(() => {
@@ -20,8 +23,14 @@ export default function CommunityView() {
   return (
     <div className="glass rounded-2xl p-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <Users className="h-4 w-4 text-accent-blue" /> Detected Networks
+        <Users className="h-4 w-4 text-accent-blue" />{" "}
+        {IS_DEMO ? "Seeded Networks" : "Detected Networks"}
       </h3>
+      {IS_DEMO && (
+        <p className="mb-3 text-xs text-ink-soft">
+          Groups from fixture membership edges, not a community-detection model.
+        </p>
+      )}
       {loading && communities.length === 0 ? (
         <LoadingSkeleton lines={4} />
       ) : (
@@ -30,7 +39,9 @@ export default function CommunityView() {
             <li key={c.id} className="rounded-lg bg-bg-tertiary p-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold">{c.name}</span>
-                <span className="text-[10px] text-text-muted">{c.size} members</span>
+                <span className="text-[10px] text-text-muted">
+                  {c.size} members
+                </span>
               </div>
               {c.crime_types.length > 0 && (
                 <p className="mt-1 text-[10px] text-text-secondary">
@@ -40,7 +51,9 @@ export default function CommunityView() {
             </li>
           ))}
           {communities.length === 0 && !loading && (
-            <p className="py-4 text-center text-xs text-text-muted">No communities detected</p>
+            <p className="py-4 text-center text-xs text-text-muted">
+              No communities detected
+            </p>
           )}
         </ul>
       )}

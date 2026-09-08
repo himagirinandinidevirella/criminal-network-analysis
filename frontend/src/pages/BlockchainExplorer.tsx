@@ -1,10 +1,17 @@
+import { IS_DEMO } from "@/config/runtime";
+import DemoIntegrity from "@/components/Demo/DemoIntegrity";
 /**
  * Blockchain Explorer page — evidence integrity, immutable audit trail,
  * record history, report certificates, agency sharing and cyber-crime
  * detection in one place.
  */
 import { Link2, ScanLine, Zap } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/Common/Tabs";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/Common/Tabs";
 import BlockchainStatusCard from "@/components/Blockchain/BlockchainStatusCard";
 import TamperDetectionDemo from "@/components/Blockchain/TamperDetectionDemo";
 import EvidenceChainPanel from "@/components/Blockchain/EvidenceChainPanel";
@@ -17,6 +24,7 @@ import CyberThreatScanner from "@/components/CyberCrime/CyberThreatScanner";
 import CyberRiskPanel from "@/components/CyberCrime/CyberRiskPanel";
 
 export default function BlockchainExplorer() {
+  if (IS_DEMO) return <DemoIntegrity />;
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -26,9 +34,12 @@ export default function BlockchainExplorer() {
             <Link2 className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Blockchain Explorer</h1>
+            <h1 className="text-xl font-bold tracking-tight">
+              Blockchain Explorer
+            </h1>
             <p className="text-xs text-text-muted">
-              Tamper-proof evidence · immutable audit trail · inter-agency sharing
+              Tamper-proof evidence · immutable audit trail · inter-agency
+              sharing
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2 rounded-lg border border-accent-cyan/30 bg-accent-cyan/10 px-3 py-1.5 text-xs text-accent-cyan">
@@ -41,7 +52,10 @@ export default function BlockchainExplorer() {
 
       <Tabs defaultValue="demo">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="demo" className="flex items-center gap-1"><Zap className="h-3.5 w-3.5" />Live Demo</TabsTrigger>
+          <TabsTrigger value="demo" className="flex items-center gap-1">
+            <Zap className="h-3.5 w-3.5" />
+            Live Demo
+          </TabsTrigger>
           <TabsTrigger value="evidence">Evidence</TabsTrigger>
           <TabsTrigger value="verify">Tamper Check</TabsTrigger>
           <TabsTrigger value="audit">Audit Trail</TabsTrigger>

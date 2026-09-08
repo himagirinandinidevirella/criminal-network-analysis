@@ -1,0 +1,11 @@
+{
+  "package": "@vladmandic/face-api",
+  "version": "1.7.15",
+  "source": "https://www.npmjs.com/package/@vladmandic/face-api",
+  "license": "MIT",
+  "purpose": "Face bounding boxes only. No identity matching or biometric templates.",
+  "sha256": {
+    "tiny_face_detector_model-weights_manifest.json": "5d1af4849ac48d5b985f4a9b16010c512353ddd6fcc63d50fd0bc9e9e64296e5",
+    "tiny_face_detector_model.bin": "b7503ce7df31039b1c43316a9b865cab6a70dd748cc602d3fa28b551503c3871"
+  }
+}

@@ -3,11 +3,17 @@
  */
 
 /** Convert an object/array to a downloadable CSV blob. */
-export function downloadCSV(filename: string, rows: Array<Record<string, unknown>>): void {
+export function downloadCSV(
+  filename: string,
+  rows: Array<Record<string, unknown>>,
+): void {
   // Lazy import keeps the bundle smaller until needed.
   import("papaparse").then(({ default: Papa }) => {
     const csv = Papa.unparse(rows);
-    triggerDownload(new Blob([csv], { type: "text/csv;charset=utf-8;" }), filename);
+    triggerDownload(
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+      filename,
+    );
   });
 }
 
@@ -20,12 +26,15 @@ export function triggerDownload(blob: Blob, filename: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Let browsers consume the URL before revoking it (notably Safari).
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** Export arbitrary data as JSON. */
 export function downloadJSON(filename: string, data: unknown): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
   triggerDownload(blob, filename);
 }
 
@@ -33,7 +42,11 @@ export function downloadJSON(filename: string, data: unknown): void {
  * Generate a simple client-side PDF (jsPDF) for quick dashboard exports.
  * Note: full reports use the backend ReportLab pipeline; this is a fallback.
  */
-export async function downloadSimplePDF(filename: string, title: string, lines: string[]): Promise<void> {
+export async function downloadSimplePDF(
+  filename: string,
+  title: string,
+  lines: string[],
+): Promise<void> {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF();
   doc.setFontSize(16);

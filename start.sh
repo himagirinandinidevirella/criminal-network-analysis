@@ -15,6 +15,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+if [[ "${1:-}" == "--demo" ]]; then
+    exec bash ./start-demo.sh "${@:2}"
+fi
+
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'

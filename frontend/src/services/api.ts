@@ -1,114 +1,137 @@
-/**
- * Axios API client.
- *
- * Centralises the base URL, JWT injection, response unwrapping and error
- * normalisation. Every service module imports from here.
- */
-import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from "axios";
+/** Same-origin API client. Browser demo is an explicit, isolated transport. */
+import axios, {
+  AxiosError,
+  type AxiosInstance,
+  type AxiosRequestConfig,
+} from "axios";
 import type { ApiResponse } from "@/types/api.types";
+import { IS_DEMO, SESSION_KEYS } from "@/config/runtime";
 
-// Relative base URL: the Vite dev server proxies /api and /ws to the backend,
-// so the browser never needs to know the backend host (works in preview too).
-export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "";
-
+export const API_BASE_URL = IS_DEMO ? "" : import.meta.env.VITE_API_URL || "";
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
+  ...(IS_DEMO
+    ? {
+        adapter: async (config) =>
+          (await import("@/demo/adapter")).demoAdapter(config),
+      }
+    : {}),
 });
-
-// ── Request interceptor: attach the JWT access token ────────────────────────
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem("crimenet_access_token");
-  if (token) {
-    config.headers = config.headers ?? {};
-    (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
-  }
+  const token = localStorage.getItem(SESSION_KEYS.access);
+  if (token) config.headers.set("Authorization", `Bearer ${token}`);
   return config;
 });
 
-// ── Response interceptor: refresh token once on 401 ─────────────────────────
-let isRefreshing = false;
+/** Prefer the server's useful error rather than "Request failed with status...". */
+export function apiErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const body = error.response?.data;
+    if (body && typeof body === "object" && !(body instanceof Blob)) {
+      if (typeof body.detail === "string") return body.detail;
+      if (typeof body.message === "string") return body.message;
+      if (Array.isArray(body.detail))
+        return body.detail
+          .map((d: { msg?: string }) => d.msg)
+          .filter(Boolean)
+          .join("; ");
+    }
+  }
+  return error instanceof Error
+    ? error.message
+    : "Request failed. Please try again.";
+}
 
+let refreshPromise: Promise<string> | null = null;
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data?.success === false)
+      throw new Error(
+        response.data.message || response.data.error || "Request failed",
+      );
+    return response;
+  },
   async (error: AxiosError) => {
     const original = error.config as AxiosRequestConfig & { _retry?: boolean };
-    if (error.response?.status === 401 && !original?._retry) {
+    // Invalid credentials should stay on the form, never loop through refresh.
+    const authRequest = /\/api\/auth\/(login|refresh)/.test(
+      original?.url ?? "",
+    );
+    if (
+      original &&
+      error.response?.status === 401 &&
+      !authRequest &&
+      !original._retry
+    ) {
       original._retry = true;
-      const refreshToken = localStorage.getItem("crimenet_refresh_token");
-      if (refreshToken && !isRefreshing) {
-        isRefreshing = true;
+      const refresh = localStorage.getItem(SESSION_KEYS.refresh);
+      if (refresh) {
         try {
-          const resp = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
-          const token = resp.data?.data?.access_token;
-          if (token) {
-            localStorage.setItem("crimenet_access_token", token);
-            original.headers = original.headers ?? {};
-            (original.headers as Record<string, string>).Authorization = `Bearer ${token}`;
-            return client(original);
-          }
+          refreshPromise ??= client
+            .post<ApiResponse<{ access_token: string }>>("/api/auth/refresh", {
+              refresh_token: refresh,
+            })
+            .then((resp) => {
+              const token = resp.data.data.access_token;
+              if (!token) throw new Error("Invalid refresh response");
+              localStorage.setItem(SESSION_KEYS.access, token);
+              return token;
+            })
+            .finally(() => {
+              refreshPromise = null;
+            });
+          const token = await refreshPromise;
+          original.headers = {
+            ...original.headers,
+            Authorization: `Bearer ${token}`,
+          };
+          return client(original);
         } catch {
-          clearSession();
-        } finally {
-          isRefreshing = false;
+          /* Clear only this mode's session. */
         }
       }
       clearSession();
-      window.location.href = "/login";
+      if (window.location.pathname !== "/login")
+        window.location.assign("/login");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
-/** Remove stored auth tokens. */
 export function clearSession(): void {
-  localStorage.removeItem("crimenet_access_token");
-  localStorage.removeItem("crimenet_refresh_token");
-  localStorage.removeItem("crimenet_user");
+  Object.values(SESSION_KEYS).forEach((key) => localStorage.removeItem(key));
 }
-
-/**
- * Perform a GET and unwrap the standard response envelope, returning `data`.
- */
-export async function get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-  const resp = await client.get<ApiResponse<T>>(url, config);
-  return resp.data.data;
+export async function get<T>(
+  url: string,
+  config?: AxiosRequestConfig,
+): Promise<T> {
+  return (await client.get<ApiResponse<T>>(url, config)).data.data;
 }
-
-/** Perform a POST and unwrap the envelope. */
 export async function post<T>(
   url: string,
   body?: unknown,
-  config?: AxiosRequestConfig
+  config?: AxiosRequestConfig,
 ): Promise<T> {
-  const resp = await client.post<ApiResponse<T>>(url, body, config);
-  return resp.data.data;
+  return (await client.post<ApiResponse<T>>(url, body, config)).data.data;
 }
-
-/** Perform a multipart form POST (file uploads). */
 export async function postForm<T>(
   url: string,
   formData: FormData,
-  config?: AxiosRequestConfig
+  config?: AxiosRequestConfig,
 ): Promise<T> {
-  const resp = await client.post<ApiResponse<T>>(url, formData, {
-    ...config,
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return resp.data.data;
+  return (
+    await client.post<ApiResponse<T>>(url, formData, {
+      ...config,
+      headers: { ...config?.headers, "Content-Type": "multipart/form-data" },
+    })
+  ).data.data;
 }
-
-/**
- * Download a binary file (PDF/CSV/Excel) from a POST endpoint.
- * Returns the Blob for triggering a browser download.
- */
 export async function postDownload(url: string, body?: unknown): Promise<Blob> {
-  const resp = await client.post(url, body, { responseType: "blob" });
-  return resp.data as Blob;
+  return (await client.post<Blob>(url, body, { responseType: "blob" })).data;
 }
-
+export async function getDownload(url: string): Promise<Blob> {
+  return (await client.get<Blob>(url, { responseType: "blob" })).data;
+}
 export default client;

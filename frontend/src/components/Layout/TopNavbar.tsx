@@ -1,3 +1,5 @@
+import { IS_DEMO } from "@/config/runtime";
+import { Menu } from "lucide-react";
 /**
  * TopNavbar — global search, classification stamp, alert bell, profile.
  */
@@ -7,11 +9,13 @@ import { useSelector } from "react-redux";
 import { Search, Bell, UserCircle } from "lucide-react";
 import { RootState } from "@/store";
 
-export default function TopNavbar() {
+export default function TopNavbar({ onMenu }: { onMenu: () => void }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const user = useSelector((state: RootState) => state.auth.user);
-  const alertCount = useSelector((state: RootState) => state.alerts.active.length);
+  const alertCount = useSelector(
+    (state: RootState) => state.alerts.active.length,
+  );
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +25,14 @@ export default function TopNavbar() {
   };
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-paper-line bg-paper-raised px-6">
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-paper-line bg-paper-raised px-3 sm:gap-4 sm:px-6">
+      <button
+        onClick={onMenu}
+        className="rounded-md p-2 text-ink-soft lg:hidden"
+        aria-label="Open navigation"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
       {/* Search bar */}
       <form onSubmit={handleSearch} className="relative max-w-xl flex-1">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
@@ -37,7 +48,9 @@ export default function TopNavbar() {
 
       <div className="ml-auto flex items-center gap-3">
         {/* Classification stamp */}
-        <span className="stamp hidden md:inline-block">Restricted</span>
+        <span className="stamp hidden md:inline-block">
+          {IS_DEMO ? "Demo" : "Restricted"}
+        </span>
 
         {/* Alerts bell */}
         <button
@@ -60,7 +73,9 @@ export default function TopNavbar() {
           aria-label="Profile"
         >
           <UserCircle className="h-6 w-6 text-ink-faint" />
-          <span className="hidden font-medium sm:inline">{user?.name ?? "Officer"}</span>
+          <span className="hidden font-medium sm:inline">
+            {user?.name ?? "Officer"}
+          </span>
         </button>
       </div>
     </header>

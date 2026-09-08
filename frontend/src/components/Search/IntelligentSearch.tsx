@@ -1,3 +1,4 @@
+import { IS_DEMO } from "@/config/runtime";
 /**
  * IntelligentSearch — search across entities + FIR auto-analysis workflow.
  */
@@ -16,6 +17,7 @@ import { errorToast } from "@/components/Common/ToastNotification";
 
 interface Props {
   initialQuery?: string;
+  initialMode?: string;
 }
 
 const SAMPLE_FIR = `FIR No: 042/2024
@@ -24,51 +26,81 @@ Raja Khan, aged 38, of Dharavi, Mumbai, is the leader of the Mumbai Drug Syndica
 import AutoInvestigator from "./AutoInvestigator";
 import { Sparkles } from "lucide-react";
 
-export default function IntelligentSearch({ initialQuery = "" }: Props) {
+export default function IntelligentSearch({
+  initialQuery = "",
+  initialMode = "",
+}: Props) {
   const dispatch = useDispatch<AppDispatch>();
   const firResult = useSelector((state: RootState) => state.criminal.firResult);
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"investigator" | "search" | "fir">(
-    initialQuery ? "search" : "investigator"
+    initialMode === "fir"
+      ? "fir"
+      : initialQuery || IS_DEMO
+        ? "search"
+        : "investigator",
   );
   const [firText, setFirText] = useState(SAMPLE_FIR);
   const [firLoading, setFirLoading] = useState(false);
+  const [filters, setFilters] = useState<Record<string, unknown>>({});
+  const [searched, setSearched] = useState(false);
+  const requestRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    if (initialQuery) {
+    setQuery(initialQuery);
+    if (initialMode === "fir") setMode("fir");
+    else if (initialQuery) {
       setMode("search");
       runSearch(initialQuery);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialQuery]);
+  }, [initialQuery, initialMode]);
 
-  const runSearch = async (q: string) => {
-    if (!q.trim()) {
+  useEffect(
+    () => () => {
+      clearTimeout(debounceRef.current);
+      requestRef.current++;
+    },
+    [],
+  );
+
+  const runSearch = async (q: string, activeFilters = filters) => {
+    const requestId = ++requestRef.current;
+    if (!q.trim() && !Object.values(activeFilters).some(Boolean)) {
       setResults([]);
+      setSearched(false);
+      setLoading(false);
       return;
     }
+    setSearched(true);
     setLoading(true);
     try {
-      const res = await post<{ items: Array<Record<string, unknown>> }>("/api/search/intelligent", {
-        query: q,
-        filters: {},
-        page: 1,
-        limit: 30,
-      });
-      setResults(res.items);
+      const res = await post<{ items: Array<Record<string, unknown>> }>(
+        "/api/search/intelligent",
+        {
+          query: q,
+          filters: activeFilters,
+          page: 1,
+          limit: 30,
+        },
+      );
+      if (requestId === requestRef.current) setResults(res.items);
     } catch {
-      errorToast("Search failed");
-      setResults([]);
+      if (requestId === requestRef.current) {
+        errorToast("Search failed");
+        setResults([]);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
   };
 
   const handleQueryChange = (q: string) => {
     setQuery(q);
+    requestRef.current++; // Invalidate an in-flight response as soon as the query changes.
     clearTimeout(debounceRef.current);
     // Debounced search (300ms).
     debounceRef.current = setTimeout(() => runSearch(q), 300);
@@ -78,7 +110,9 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
     if (!firText.trim()) return;
     setFirLoading(true);
     try {
-      await dispatch(analyzeFir({ fir_text: firText, language: "en" })).unwrap();
+      await dispatch(
+        analyzeFir({ fir_text: firText, language: "en" }),
+      ).unwrap();
     } catch {
       errorToast("FIR analysis failed");
     } finally {
@@ -89,24 +123,31 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Investigation Command Center</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Investigation Command Center
+        </h1>
         <p className="text-sm text-text-secondary">
-          Autonomous forensic evidence analysis, biometric matching, and multi-hop syndicate correlation
+          {IS_DEMO
+            ? "Search synthetic records or preview entity extraction from a sample incident report"
+            : "Forensic evidence analysis and multi-hop network correlation"}
         </p>
       </div>
 
       {/* Mode toggle */}
       <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setMode("investigator")}
-          className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition ${
-            mode === "investigator"
-              ? "border-seal bg-seal text-ink-onred"
-              : "border-paper-line bg-paper-raised text-ink-soft hover:bg-paper-sunk"
-          }`}
-        >
-          <Sparkles className="h-4 w-4" /> Autonomous AI Investigator (AFIS & IDs)
-        </button>
+        {!IS_DEMO && (
+          <button
+            onClick={() => setMode("investigator")}
+            className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition ${
+              mode === "investigator"
+                ? "border-seal bg-seal text-ink-onred"
+                : "border-paper-line bg-paper-raised text-ink-soft hover:bg-paper-sunk"
+            }`}
+          >
+            <Sparkles className="h-4 w-4" /> Autonomous AI Investigator (AFIS &
+            IDs)
+          </button>
+        )}
         <button
           onClick={() => setMode("search")}
           className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition ${
@@ -125,7 +166,8 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
               : "border-paper-line bg-paper-raised text-ink-soft hover:bg-paper-sunk"
           }`}
         >
-          <FileSearch className="h-4 w-4" /> Graph Extraction Pipeline
+          <FileSearch className="h-4 w-4" />{" "}
+          {IS_DEMO ? "FIR Entity Preview" : "Graph Extraction Pipeline"}
         </button>
       </div>
 
@@ -143,19 +185,33 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
               autoFocus
             />
           </div>
-          <AdvancedFilters onApply={(filters) => runSearch(query)} />
+          <AdvancedFilters
+            onApply={(next) => {
+              clearTimeout(debounceRef.current);
+              setFilters(next);
+              runSearch(query, next);
+            }}
+          />
           {loading && (
             <div className="flex justify-center py-6 text-text-muted">
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           )}
-          <SearchResults results={results} />
+          {!loading && <SearchResults results={results} searched={searched} />}
         </>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="glass rounded-2xl p-4">
             <h3 className="mb-3 text-sm font-semibold">FIR Document</h3>
+            {IS_DEMO && (
+              <p className="mb-3 text-xs text-teal">
+                Dictionary + regex preview, not an NLP model. Matches existing
+                fictional records; does not create graph entities. Use sample
+                data only.
+              </p>
+            )}
             <textarea
+              aria-label="FIR document"
               value={firText}
               onChange={(e) => setFirText(e.target.value)}
               rows={14}
@@ -166,7 +222,11 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
               disabled={firLoading}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-accent-blue py-2.5 text-sm font-semibold text-white transition hover:bg-seal-dark disabled:opacity-50"
             >
-              {firLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}
+              {firLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSearch className="h-4 w-4" />
+              )}
               ANALYZE FIR
             </button>
           </div>
@@ -174,10 +234,22 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
           <div className="space-y-4">
             {firResult && (
               <div className="glass rounded-2xl p-4">
-                <h3 className="mb-3 text-sm font-semibold">Extracted Entities</h3>
+                <h3 className="mb-3 text-sm font-semibold">
+                  Extracted Entities
+                </h3>
                 <div className="space-y-2">
-                  {(["PERSON", "LOCATION", "ORGANIZATION", "VEHICLE", "ACCOUNT"] as const).map((type) => {
-                    const entities = firResult.entities.filter((e) => e.type === type);
+                  {(
+                    [
+                      "PERSON",
+                      "LOCATION",
+                      "ORGANIZATION",
+                      "VEHICLE",
+                      "ACCOUNT",
+                    ] as const
+                  ).map((type) => {
+                    const entities = firResult.entities.filter(
+                      (e) => e.type === type,
+                    );
                     if (entities.length === 0) return null;
                     return (
                       <div key={type} className="rounded-lg bg-bg-tertiary p-3">
@@ -198,9 +270,19 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
                     );
                   })}
                 </div>
+                {IS_DEMO && (
+                  <p className="mt-3 text-xs text-teal">
+                    {firResult.entities.length
+                      ? "Matched synthetic records and identifier patterns. No new graph records were created."
+                      : "No known fixture names or supported identifiers found. Try the sample FIR."}
+                  </p>
+                )}
                 {Object.keys(firResult.created).length > 0 && (
                   <p className="mt-3 text-xs text-risk-low">
-                    ✅ Graph updated: {Object.entries(firResult.created).map(([k, v]) => `${k} ×${v}`).join(", ")}
+                    ✅ Graph updated:{" "}
+                    {Object.entries(firResult.created)
+                      .map(([k, v]) => `${k} ×${v}`)
+                      .join(", ")}
                   </p>
                 )}
               </div>
@@ -208,7 +290,9 @@ export default function IntelligentSearch({ initialQuery = "" }: Props) {
 
             {/* Related criminals */}
             <div className="glass rounded-2xl p-4">
-              <h3 className="mb-3 text-sm font-semibold">Linked Persons</h3>
+              <h3 className="mb-3 text-sm font-semibold">
+                {IS_DEMO ? "Example profiles" : "Linked Persons"}
+              </h3>
               <RelatedCriminals />
             </div>
           </div>
@@ -231,7 +315,9 @@ function RelatedCriminals() {
       {items.map((c) => (
         <CriminalCard key={c.id} criminal={c} />
       ))}
-      {items.length === 0 && <p className="py-2 text-xs text-text-muted">No linked persons</p>}
+      {items.length === 0 && (
+        <p className="py-2 text-xs text-text-muted">No linked persons</p>
+      )}
     </div>
   );
 }

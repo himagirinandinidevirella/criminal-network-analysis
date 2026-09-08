@@ -1,7 +1,8 @@
+import { errorToast } from "@/components/Common/ToastNotification";
 /**
  * WhatIfSimulator — simulate removing a criminal from the network.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FlaskConical, Loader2 } from "lucide-react";
 import { post, get } from "@/services/api";
 import type { Criminal } from "@/types/criminal.types";
@@ -16,12 +17,18 @@ export default function WhatIfSimulator() {
 
   const loadOptions = async () => {
     try {
-      const res = await get<Paginated<Criminal>>("/api/criminals/?limit=50&sort_by=risk_score");
+      const res = await get<Paginated<Criminal>>(
+        "/api/criminals/?limit=50&sort_by=risk_score",
+      );
       setOptions(res.items);
     } catch {
       setOptions([]);
     }
   };
+
+  useEffect(() => {
+    loadOptions();
+  }, []);
 
   const simulate = async () => {
     if (!criminalId) return;
@@ -32,6 +39,8 @@ export default function WhatIfSimulator() {
         action: "ARREST",
       });
       setResult(res);
+    } catch {
+      errorToast("Could not run the graph simulation");
     } finally {
       setLoading(false);
     }
@@ -42,17 +51,22 @@ export default function WhatIfSimulator() {
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
         <FlaskConical className="h-4 w-4 text-risk-high" /> What-If Simulator
       </h3>
+      <p className="mb-3 text-xs text-ink-soft">
+        Structural simulation only. Does not change records or predict an
+        arrest's outcome.
+      </p>
       <div className="space-y-2">
         <select
           value={criminalId}
           onChange={(e) => setCriminalId(e.target.value)}
-          onFocus={loadOptions}
           className="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-2 text-xs text-text-primary"
           aria-label="Select criminal to simulate arrest"
         >
-          <option value="">If arrested: Select criminal…</option>
+          <option value="">Remove node: Select person…</option>
           {options.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
         </select>
         <button
@@ -76,12 +90,19 @@ export default function WhatIfSimulator() {
             <span className="font-semibold">{result.impact.edges_removed}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-text-muted">Community fragmentation</span>
-            <span className="font-semibold text-risk-high">+{result.impact.community_fragmentation}</span>
+            <span className="text-text-muted">
+              Change in connected components
+            </span>
+            <span className="font-semibold text-risk-high">
+              {result.impact.community_fragmentation > 0 ? "+" : ""}
+              {result.impact.community_fragmentation}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-text-muted">Network state</span>
-            <span className="font-semibold">{result.impact.network_resilience}</span>
+            <span className="font-semibold">
+              {result.impact.network_resilience}
+            </span>
           </div>
         </div>
       )}

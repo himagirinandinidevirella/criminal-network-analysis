@@ -1,11 +1,15 @@
+import { IS_DEMO } from "@/config/runtime";
 /**
  * ShareReport — generate a secure, expiring share link.
  */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Copy } from "lucide-react";
-import { post } from "@/services/api";
-import { successToast, errorToast } from "@/components/Common/ToastNotification";
+import { postForm } from "@/services/api";
+import {
+  successToast,
+  errorToast,
+} from "@/components/Common/ToastNotification";
 
 interface Props {
   criminalId: string;
@@ -16,18 +20,25 @@ export default function ShareReport({ criminalId, onClose }: Props) {
   const [expiry, setExpiry] = useState(24);
   const [access, setAccess] = useState("VIEW");
   const [shareUrl, setShareUrl] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const create = async () => {
+    setCreating(true);
     try {
       const form = new FormData();
       form.append("report_id", criminalId);
       form.append("expiry_hours", String(expiry));
       form.append("access_level", access);
-      const res = await post<{ share_url: string }>("/api/actions/share", form);
+      const res = await postForm<{ share_url: string }>(
+        "/api/actions/share",
+        form,
+      );
       setShareUrl(res.share_url);
       successToast("Share link created");
     } catch {
       errorToast("Could not create share link");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -49,12 +60,23 @@ export default function ShareReport({ criminalId, onClose }: Props) {
         >
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-bold">Share Report</h3>
-            <button onClick={onClose} aria-label="Close"><X className="h-4 w-4" /></button>
+            <button onClick={onClose} aria-label="Close">
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
+          {IS_DEMO && (
+            <p className="mb-4 rounded-lg bg-teal-soft p-3 text-xs text-teal">
+              Local preview only. This snapshot link works in this browser, not
+              on other devices. It is not a secure public sharing service.
+              Export a report file to share the demo externally.
+            </p>
+          )}
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-xs text-text-secondary">Expiry</label>
+              <label className="mb-1 block text-xs text-text-secondary">
+                Expiry
+              </label>
               <select
                 value={expiry}
                 onChange={(e) => setExpiry(Number(e.target.value))}
@@ -66,7 +88,9 @@ export default function ShareReport({ criminalId, onClose }: Props) {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-text-secondary">Access level</label>
+              <label className="mb-1 block text-xs text-text-secondary">
+                Access level
+              </label>
               <select
                 value={access}
                 onChange={(e) => setAccess(e.target.value)}
@@ -79,18 +103,36 @@ export default function ShareReport({ criminalId, onClose }: Props) {
 
             <button
               onClick={create}
+              disabled={creating}
               className="w-full rounded-lg bg-accent-blue py-2.5 text-sm font-semibold text-white transition hover:bg-seal-dark"
             >
-              Generate secure link
+              {creating
+                ? "Creating…"
+                : IS_DEMO
+                  ? "Create local preview link"
+                  : "Generate secure link"}
             </button>
 
             {shareUrl && (
               <div className="flex items-center gap-2 rounded-lg bg-bg-tertiary p-2">
-                <code className="flex-1 truncate text-xs text-accent-cyan">{shareUrl}</code>
+                <a
+                  href={shareUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="min-w-0 flex-1 break-all text-xs text-teal underline"
+                >
+                  {shareUrl}
+                </a>
                 <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(shareUrl);
-                    successToast("Copied to clipboard");
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(shareUrl);
+                      successToast("Copied to clipboard");
+                    } catch {
+                      errorToast(
+                        "Clipboard unavailable. Copy the displayed link manually.",
+                      );
+                    }
                   }}
                   aria-label="Copy link"
                 >

@@ -34,16 +34,9 @@ export default function SuggestedQueries({ onQuery }: Props) {
           </button>
         ))}
       </div>
-      <div className="mt-4 border-t border-border pt-3">
-        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-          Conversation History
-        </h4>
-        <ul className="space-y-1 text-[11px] text-text-muted">
-          <li>• Today (3)</li>
-          <li>• Yesterday (7)</li>
-          <li>• 2 days ago (4)</li>
-        </ul>
-      </div>
+      <p className="mt-4 border-t border-paper-line pt-3 text-[11px] text-ink-soft">
+        Conversation history is temporary and clears when you leave this page.
+      </p>
     </div>
   );
 }

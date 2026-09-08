@@ -1,3 +1,4 @@
+import { IS_DEMO } from "@/config/runtime";
 /**
  * MainDashboard — assembles the full dashboard layout.
  * Opens with an evaluator-facing "briefing" strip (what this system does).
@@ -10,6 +11,7 @@ import { AppDispatch, RootState } from "@/store";
 import { fetchStatistics } from "@/store/networkSlice";
 import { fetchActiveAlerts, fetchAlertStats } from "@/store/alertSlice";
 import StatsCards from "./StatsCards";
+import CCTVMonitor from "@/components/CCTV/CCTVMonitor";
 import CrimeTypeChart from "./CrimeTypeChart";
 import RiskDistributionChart from "./RiskDistributionChart";
 import GeographicSummary from "./GeographicSummary";
@@ -17,9 +19,28 @@ import ActivityFeed from "./ActivityFeed";
 import NetworkPreview from "./NetworkPreview";
 
 const PIPELINE = [
-  { icon: Database, step: "01", title: "Ingest", text: "FIRs, call records, financial trails, seized devices" },
-  { icon: Radar, step: "02", title: "Analyze", text: "Entity graph + AI risk scoring & anomaly detection" },
-  { icon: Rocket, step: "03", title: "Act", text: "Real-time alerts, dossiers, blockchain-sealed evidence" },
+  {
+    icon: Database,
+    step: "01",
+    title: "Ingest",
+    text: "FIRs, call records, financial trails, seized devices",
+  },
+  {
+    icon: Radar,
+    step: "02",
+    title: "Analyze",
+    text: IS_DEMO
+      ? "Graph search, paths & illustrative risk scores"
+      : "Entity graph + AI risk scoring & anomaly detection",
+  },
+  {
+    icon: Rocket,
+    step: "03",
+    title: "Act",
+    text: IS_DEMO
+      ? "Local alerts, notes & downloadable reports"
+      : "Real-time alerts, dossiers, blockchain-sealed evidence",
+  },
 ];
 
 export default function MainDashboard() {
@@ -40,7 +61,9 @@ export default function MainDashboard() {
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-faint">
             Briefing · System overview
           </span>
-          <span className="stamp">SIH 2025</span>
+          <span className="stamp">
+            {IS_DEMO ? "Operation Mumbai · Demo" : "SIH 2025"}
+          </span>
         </div>
 
         <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center lg:p-8">
@@ -52,9 +75,9 @@ export default function MainDashboard() {
               See the network behind the crime.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-soft">
-              CrimeNet fuses scattered case data into one living graph of persons,
-              organisations, vehicles, accounts and crime events — then predicts who
-              is most dangerous, and seals every action on an audit-proof ledger.
+              {IS_DEMO
+                ? "Explore a fictional case network of people, organisations, vehicles, accounts and events. Follow connections, review records and export your findings — no database setup needed."
+                : "CrimeNet connects case data into a graph of persons, organisations, vehicles, accounts and crime events for investigator review."}
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -65,16 +88,22 @@ export default function MainDashboard() {
                 >
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4 text-seal" />
-                    <span className="font-mono text-[10px] text-ink-faint">{step}</span>
+                    <span className="font-mono text-[10px] text-ink-faint">
+                      {step}
+                    </span>
                   </div>
-                  <div className="dossier-title mt-2 text-base font-semibold">{title}</div>
-                  <p className="mt-1 text-xs leading-relaxed text-ink-soft">{text}</p>
+                  <div className="dossier-title mt-2 text-base font-semibold">
+                    {title}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+                    {text}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex flex-row gap-2 lg:flex-col">
+          <div className="flex flex-wrap gap-2 lg:flex-col">
             <Link
               to="/overview"
               className="inline-flex items-center justify-center gap-2 rounded-md bg-seal px-4 py-2.5 text-sm font-semibold text-ink-onred transition hover:bg-seal-dark"
@@ -88,11 +117,28 @@ export default function MainDashboard() {
             >
               Explore the graph
             </Link>
+            <button
+              onClick={() =>
+                document
+                  .getElementById("cctv-monitor")
+                  ?.scrollIntoView({ block: "start", behavior: "smooth" })
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-teal/30 bg-teal-soft px-4 py-2.5 text-sm font-medium text-teal transition hover:bg-teal/10"
+            >
+              CCTV monitor
+            </button>
+            <Link
+              to="/fingerprints"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-paper-line px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-paper-sunk"
+            >
+              Fingerprint verification
+            </Link>
           </div>
         </div>
       </section>
 
       <StatsCards />
+      <CCTVMonitor />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

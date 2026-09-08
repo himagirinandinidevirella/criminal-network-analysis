@@ -1,3 +1,4 @@
+import { getAlertPreferences } from "@/services/preferences";
 /**
  * useRealTimeAlerts — real-time alert effects (sound, flash, toast, browser
  * notification). Self-subscribes to the alert WebSocket stream so any mounted
@@ -35,25 +36,38 @@ export function useRealTimeAlerts({ onAlert, sound = true }: Options = {}): {
   useEffect(() => {
     alertSocket.connect();
     const unsubscribe = alertSocket.onAlert((alert) => {
-      // Toast notification.
-      toast(`${alert.severity}: ${alert.title}`, {
-        icon: alert.severity === "CRITICAL" ? "🚨" : "⚠️",
-        style: {
-          background: alert.severity === "CRITICAL" ? "#5E1610" : "#1B2530",
-          color: "#FCFAF5",
-          border: alert.severity === "CRITICAL" ? "1px solid #B3261E" : "1px solid #DDD5C2",
-        },
-      });
+      const preferences = getAlertPreferences();
+      // Notification preferences are read per event, including changes made in Settings.
+      if (preferences.toasts)
+        toast(`${alert.severity}: ${alert.title}`, {
+          icon: alert.severity === "CRITICAL" ? "🚨" : "⚠️",
+          style: {
+            background: alert.severity === "CRITICAL" ? "#5E1610" : "#1B2530",
+            color: "#FCFAF5",
+            border:
+              alert.severity === "CRITICAL"
+                ? "1px solid #B3261E"
+                : "1px solid #DDD5C2",
+          },
+        });
 
       // Sound for critical/high alerts.
-      if (sound && (alert.severity === "CRITICAL" || alert.severity === "HIGH")) {
+      if (
+        preferences.sound &&
+        sound &&
+        (alert.severity === "CRITICAL" || alert.severity === "HIGH")
+      ) {
         audioRef.current?.play().catch(() => {
           /* autoplay may be blocked; ignore */
         });
       }
 
       // Red flash overlay for critical alerts.
-      if (alert.severity === "CRITICAL") {
+      if (
+        preferences.toasts &&
+        alert.severity === "CRITICAL" &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
         const overlay = document.createElement("div");
         overlay.style.cssText =
           "position:fixed;inset:0;background:rgba(239,68,68,0.3);z-index:9999;pointer-events:none;animation:flashRed 0.5s ease-in-out;";
@@ -62,7 +76,11 @@ export function useRealTimeAlerts({ onAlert, sound = true }: Options = {}): {
       }
 
       // Browser notification (requires permission).
-      if ("Notification" in window && Notification.permission === "granted") {
+      if (
+        preferences.browser &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
         new Notification(`CrimeNet AI — ${alert.severity} alert`, {
           body: alert.title,
         });

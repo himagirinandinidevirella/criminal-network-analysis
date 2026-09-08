@@ -1,5 +1,16 @@
 # 🕸️ CrimeNet AI — AI-Powered Criminal Network Analysis System
 
+> **Try the standalone demo:** `bash start.sh --demo` (Node.js 20+).
+> Open the live preview / port 3000 and click **Explore demo**. No Docker,
+> database, API key or external model download is required.
+>
+> This mode uses **synthetic browser-local data**. Its assistant and scores are
+> illustrative. CCTV includes a real, opt-in browser-local face detector (boxes
+> and counts only), while live camera feeds and blockchain are not connected.
+> See [DEMO_GUIDE.md](DEMO_GUIDE.md) for setup, working flows, limitations and tests.
+> The full-stack architecture described below is separate and requires its own
+> infrastructure and validation; it is not a claim of production readiness.
+
 **Smart India Hackathon 2025** · Ministry of Home Affairs — India
 
 CrimeNet AI is a full-stack intelligence platform that ingests police records
@@ -18,18 +29,18 @@ DATA SOURCES → DATA COLLECTION → DATA PREPROCESSING → ENTITY EXTRACTION (N
 → INVESTIGATOR ACTION → REPORT GENERATION
 ```
 
-| Step | Implementation |
-|------|----------------|
-| 1. Data Sources | FIR text/PDF, CDR CSV, bank/UPI/crypto records, social/news, vehicle (RTO), court records |
-| 2. Data Collection | Bulk CSV/PDF/Excel/JSON import, REST upload endpoints, drag-and-drop UI, Kafka/WebSocket ingestion |
-| 3. Preprocessing | HTML strip, date/phone normalisation, Pydantic validation, dedup, imputation, geocoding |
-| 4. Entity Extraction | `multilingual-bert-base-cased` + spaCy + regex → PERSON/LOCATION/VEHICLE/ACCOUNT/ORGANIZATION |
-| 5. Graph Creation | Neo4j nodes (Person, Vehicle, Account, Organization, Location, Transaction, CrimeEvent) + 12 relationship types |
-| 6. AI/ML Models | NLP extractor, GraphSAGE GNN, XGBoost+SHAP risk scorer, Isolation Forest+LSTM anomaly detector, LSTM+RF crime predictor, link predictor |
-| 7. Network Analysis | PageRank/centrality, Louvain communities, shortest paths, hidden-link prediction, what-if simulation |
-| 8. Visual Dashboard | Cytoscape network map, Recharts, Leaflet heatmap, risk panel, alert feed |
-| 9. Investigator Actions | Verify (badge + timestamp), notes (react-quill), evidence upload (chain of custody), flag/escalate |
-| 10. Report Generation | PDF (ReportLab), CSV, Excel (openpyxl), JSON + secure expiring share links |
+| Step                    | Implementation                                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Data Sources         | FIR text/PDF, CDR CSV, bank/UPI/crypto records, social/news, vehicle (RTO), court records                                               |
+| 2. Data Collection      | Bulk CSV/PDF/Excel/JSON import, REST upload endpoints, drag-and-drop UI, Kafka/WebSocket ingestion                                      |
+| 3. Preprocessing        | HTML strip, date/phone normalisation, Pydantic validation, dedup, imputation, geocoding                                                 |
+| 4. Entity Extraction    | `multilingual-bert-base-cased` + spaCy + regex → PERSON/LOCATION/VEHICLE/ACCOUNT/ORGANIZATION                                           |
+| 5. Graph Creation       | Neo4j nodes (Person, Vehicle, Account, Organization, Location, Transaction, CrimeEvent) + 12 relationship types                         |
+| 6. AI/ML Models         | NLP extractor, GraphSAGE GNN, XGBoost+SHAP risk scorer, Isolation Forest+LSTM anomaly detector, LSTM+RF crime predictor, link predictor |
+| 7. Network Analysis     | PageRank/centrality, Louvain communities, shortest paths, hidden-link prediction, what-if simulation                                    |
+| 8. Visual Dashboard     | Cytoscape network map, Recharts, Leaflet heatmap, risk panel, alert feed                                                                |
+| 9. Investigator Actions | Verify (badge + timestamp), notes (react-quill), evidence upload (chain of custody), flag/escalate                                      |
+| 10. Report Generation   | PDF (ReportLab), CSV, Excel (openpyxl), JSON + secure expiring share links                                                              |
 
 ---
 
@@ -70,7 +81,55 @@ criminal-network-analysis/
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start — browser-only demo
+
+```bash
+bash start.sh --demo
+```
+
+Or use npm directly (including on Windows):
+
+```bash
+cd frontend
+npm ci
+npm run demo
+```
+
+The demo includes 40 fictional people and 112 graph entities, working search and
+combined filters, shortest paths, non-destructive graph simulation, saved notes
+and review actions, local alert workflows, SHA-256 checks, and real
+PDF/CSV/XLSX/JSON report downloads. Public previews and report history are local
+to the current browser and origin. Reset data in Settings.
+
+The dashboard also includes **CCTV Monitor**: view up to four recordings together,
+switch to a single camera, and enable real on-device face detection with boxes,
+confidence scores and frame-level counts. Click **Try AI test clip** to verify
+it using a clearly labeled, AI-generated example. Download a combined PNG or
+save a manual review flag to Alerts. No live cameras, face identification,
+cross-camera identity tracking or automated crime classification are connected.
+See the CCTV section in [DEMO_GUIDE.md](DEMO_GUIDE.md).
+
+**Cross-camera tracking** also provides manual event trails: bookmark moments in
+different views, add operator notes, review/reorder the camera sequence, seek
+available source moments and export a JSON trail. These are explicit, unverified
+manual links—not automated identification or cross-camera person tracking.
+
+For a static build: `cd frontend && npm run build:demo`. For automated checks:
+`npm test` and `npm run test:e2e` from `frontend/` (install Playwright Chromium
+first). See [DEMO_GUIDE.md](DEMO_GUIDE.md) for the full walkthrough.
+
+**Fingerprint verification** includes two separate local tools: SHA-256 file
+comparison (reference hash or second file), and a consent-based device
+biometric/passkey demonstration using WebAuthn. The latter can use a device's
+fingerprint reader, Face ID or PIN; it does not match uploaded fingerprint scans
+or identify a person. Its browser-local public-key record is not production
+authentication. See [DEMO_GUIDE.md](DEMO_GUIDE.md) for hardware, new-tab and
+security-boundary details.
+
+### Full-stack startup — Docker
+
+The following starts the original backend/database stack, **not** the standalone
+demo. It requires separately configured services and dependencies.
 
 ```bash
 # 1. Clone / copy this project
@@ -92,23 +151,26 @@ data → frontend + nginx) and prints access URLs.
 
 ### Demo accounts
 
-| Role | Login | Password |
-|------|-------|----------|
-| Admin | `admin@crimenet.gov.in` | `Admin@123` |
-| Officer | `officer@crimenet.gov.in` | `Officer@123` |
-| Analyst | `analyst@crimenet.gov.in` | `Analyst@123` |
-| Senior Officer | `senior@crimenet.gov.in` | `Senior@123` |
+| Role           | Login                     | Password      |
+| -------------- | ------------------------- | ------------- |
+| Admin          | `admin@crimenet.gov.in`   | `Admin@123`   |
+| Officer        | `officer@crimenet.gov.in` | `Officer@123` |
+| Analyst        | `analyst@crimenet.gov.in` | `Analyst@123` |
+| Senior Officer | `senior@crimenet.gov.in`  | `Senior@123`  |
 
 Guest link: `/public/report/demo-token-2025`
 
-### 🎬 Demo Mode (hackathon demo scenario)
+### 🎬 Guided tour (full-stack mode)
 
-The login page has a **DEMO MODE** button that auto-runs the ~5-minute guided
+For the standalone browser tour, use `bash start.sh --demo` and **Start guided
+walkthrough** instead; it describes only the available local features.
+
+In full-stack mode, the login page has a **DEMO MODE** button that auto-runs the ~5-minute guided
 tour from the SIH 2025 spec:
 
 1. Dashboard overview → 2. FIR auto-analysis (NLP) → 3. Network exploration →
-4. Risk & anomaly (SHAP) → 5. Predictions → 6. Live alert (flash + sound) →
-7. AI chatbot → 8. Report generation
+2. Risk & anomaly (SHAP) → 5. Predictions → 6. Live alert (flash + sound) →
+3. AI chatbot → 8. Report generation
 
 It logs in with the demo admin account, drives the app through every screen,
 fires a real WebSocket alert, and shows a narrated overlay with pause / skip /

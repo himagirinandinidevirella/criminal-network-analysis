@@ -8,5 +8,10 @@ export default function Investigation() {
   const [params] = useSearchParams();
   const initialQuery = params.get("q") ?? "";
 
-  return <IntelligentSearch initialQuery={initialQuery} />;
+  return (
+    <IntelligentSearch
+      initialQuery={initialQuery}
+      initialMode={params.get("mode") ?? ""}
+    />
+  );
 }

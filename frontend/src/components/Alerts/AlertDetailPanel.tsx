@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 /**
  * AlertDetailPanel — modal with full alert details.
  */
@@ -12,6 +13,13 @@ interface Props {
 }
 
 export default function AlertDetailPanel({ alert, onClose }: Props) {
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [onClose]);
   return (
     <AnimatePresence>
       <motion.div
@@ -23,6 +31,9 @@ export default function AlertDetailPanel({ alert, onClose }: Props) {
       >
         <motion.div
           className="glass w-full max-w-md rounded-2xl p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Alert ${alert.id} details`}
           initial={{ scale: 0.92, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.92, opacity: 0 }}
@@ -30,7 +41,11 @@ export default function AlertDetailPanel({ alert, onClose }: Props) {
         >
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold">Alert #{alert.id}</h3>
-            <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-bg-hover" aria-label="Close">
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 hover:bg-bg-hover"
+              aria-label="Close"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -46,9 +61,14 @@ export default function AlertDetailPanel({ alert, onClose }: Props) {
               ["Created", formatDateTime(alert.created_at)],
               ["Source", alert.source],
             ].map(([k, v]) => (
-              <div key={k} className="flex justify-between border-b border-border/50 pb-1">
+              <div
+                key={k}
+                className="flex justify-between border-b border-border/50 pb-1"
+              >
                 <dt className="text-text-muted">{k}</dt>
-                <dd className="max-w-[60%] text-right text-text-primary">{v}</dd>
+                <dd className="max-w-[60%] text-right text-text-primary">
+                  {v}
+                </dd>
               </div>
             ))}
           </dl>

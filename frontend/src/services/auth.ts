@@ -1,3 +1,4 @@
+import { SESSION_KEYS } from "@/config/runtime";
 /**
  * Auth service — login, profile and role helpers.
  */
@@ -13,9 +14,9 @@ export interface LoginPayload {
 /** Authenticate and persist tokens. */
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   const result = await post<LoginResponse>("/api/auth/login", payload);
-  localStorage.setItem("crimenet_access_token", result.access_token);
-  localStorage.setItem("crimenet_refresh_token", result.refresh_token);
-  localStorage.setItem("crimenet_user", JSON.stringify(result.user_profile));
+  localStorage.setItem(SESSION_KEYS.access, result.access_token);
+  localStorage.setItem(SESSION_KEYS.refresh, result.refresh_token);
+  localStorage.setItem(SESSION_KEYS.user, JSON.stringify(result.user_profile));
   return result;
 }
 
@@ -26,7 +27,7 @@ export function fetchMe(): Promise<MeResponse> {
 
 /** Read the cached user profile from localStorage. */
 export function getStoredUser(): UserProfile | null {
-  const raw = localStorage.getItem("crimenet_user");
+  const raw = localStorage.getItem(SESSION_KEYS.user);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as UserProfile;
@@ -37,5 +38,5 @@ export function getStoredUser(): UserProfile | null {
 
 /** Whether the user is currently authenticated. */
 export function isAuthenticated(): boolean {
-  return Boolean(localStorage.getItem("crimenet_access_token"));
+  return Boolean(localStorage.getItem(SESSION_KEYS.access));
 }

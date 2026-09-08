@@ -36,7 +36,9 @@ export default function AdvancedFilters({ onApply }: Props) {
           >
             <option value="">Risk: All</option>
             {["CRITICAL", "HIGH", "MEDIUM", "LOW"].map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>
+                {r}
+              </option>
             ))}
           </select>
           <select
@@ -46,8 +48,15 @@ export default function AdvancedFilters({ onApply }: Props) {
             aria-label="Crime type"
           >
             <option value="">Crime: All</option>
-            {["Drug Trafficking", "Money Laundering", "Cyber Crime", "Extortion"].map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {[
+              "Drug Trafficking",
+              "Money Laundering",
+              "Cyber Crime",
+              "Extortion",
+            ].map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
           </select>
           <select
@@ -57,15 +66,30 @@ export default function AdvancedFilters({ onApply }: Props) {
             aria-label="Status"
           >
             <option value="">Status: All</option>
-            {["WANTED", "ARRESTED", "CONVICTED", "UNDER_INVESTIGATION"].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
+            {["WANTED", "ARRESTED", "CONVICTED", "UNDER_INVESTIGATION"].map(
+              (s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ),
+            )}
           </select>
           <button
             onClick={apply}
             className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-seal-dark"
           >
             Apply
+          </button>
+          <button
+            onClick={() => {
+              setRiskLevel("");
+              setCrimeType("");
+              setStatus("");
+              onApply({});
+            }}
+            className="rounded-lg border border-paper-line px-3 py-1.5 text-xs text-ink-soft"
+          >
+            Reset filters
           </button>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { IS_DEMO } from "@/config/runtime";
 /**
  * DemoProvider — owns the guided demo state machine and renders the overlay.
  *
@@ -27,7 +28,11 @@ const STEP_DURATIONS: Record<number, number> = {
   8: 30, // Report generation
 };
 
-export default function DemoProvider({ children }: { children: React.ReactNode }) {
+export default function DemoProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const [active, setActive] = useState(false);
@@ -53,7 +58,7 @@ export default function DemoProvider({ children }: { children: React.ReactNode }
   }, [navigate]);
 
   const startDemo = useCallback(async () => {
-    toast("Starting 5-minute guided demo…", { icon: "▶️" });
+    toast("Starting guided walkthrough…", { icon: "▶️" });
     try {
       // Auto-login as the demo admin account.
       await dispatch(
@@ -61,10 +66,14 @@ export default function DemoProvider({ children }: { children: React.ReactNode }
           badge_id: "admin@crimenet.gov.in",
           password: "Admin@123",
           department: "Ministry of Home Affairs",
-        })
+        }),
       ).unwrap();
     } catch {
-      toast.error("Demo requires a running backend — run `bash start.sh` first");
+      toast.error(
+        IS_DEMO
+          ? "Could not open the local demo. Check browser storage permissions."
+          : "The tour requires a running backend, or start the standalone demo with bash start.sh --demo",
+      );
       return;
     }
     setRajaId(null);
@@ -98,11 +107,14 @@ export default function DemoProvider({ children }: { children: React.ReactNode }
         switch (step.id) {
           case 2: {
             // FIR auto-analysis: run extraction, then show the results page.
-            await dispatch(analyzeFir({ fir_text: DEMO_FIR, language: "en" })).unwrap();
+            await dispatch(
+              analyzeFir({ fir_text: DEMO_FIR, language: "en" }),
+            ).unwrap();
             break;
           }
           case 4:
           case 5: {
+            if (IS_DEMO && step.id === 5) break;
             // Open Raja Khan's profile (resolves his id once via search).
             let id = rajaId;
             if (!id) {
@@ -151,7 +163,16 @@ export default function DemoProvider({ children }: { children: React.ReactNode }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, stepIndex, paused]);
 
-  const value = { active, stepIndex, paused, steps: DEMO_STEPS, startDemo, togglePause, next, exit };
+  const value = {
+    active,
+    stepIndex,
+    paused,
+    steps: DEMO_STEPS,
+    startDemo,
+    togglePause,
+    next,
+    exit,
+  };
 
   return (
     <DemoContext.Provider value={value}>

@@ -1,3 +1,4 @@
+import { SESSION_KEYS } from "@/config/runtime";
 /**
  * ProtectedRoute — redirects unauthenticated users to /login.
  * Optionally restricts by role.
@@ -13,7 +14,7 @@ interface Props {
 
 export default function ProtectedRoute({ children, roles }: Props) {
   const location = useLocation();
-  const token = localStorage.getItem("crimenet_access_token");
+  const token = localStorage.getItem(SESSION_KEYS.access);
   const user = getStoredUser();
 
   if (!token) {

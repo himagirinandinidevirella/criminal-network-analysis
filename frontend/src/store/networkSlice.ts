@@ -19,6 +19,8 @@ interface NetworkState {
   path: PathResult | null;
   loading: boolean;
   error: string | null;
+  graphRequestId: string | null;
+  pathRequestId: string | null;
 }
 
 const initialState: NetworkState = {
@@ -29,6 +31,8 @@ const initialState: NetworkState = {
   path: null,
   loading: false,
   error: null,
+  graphRequestId: null,
+  pathRequestId: null,
 };
 
 export const fetchFullGraph = createAsyncThunk(
@@ -37,31 +41,31 @@ export const fetchFullGraph = createAsyncThunk(
     const query = new URLSearchParams(
       Object.entries(filters)
         .filter(([, v]) => v !== undefined && v !== null && v !== "")
-        .map(([k, v]) => [k, String(v)])
+        .map(([k, v]) => [k, String(v)]),
     );
     return get<GraphData>(`/api/network/full?${query.toString()}`);
-  }
+  },
 );
 
 export const fetchCommunities = createAsyncThunk(
   "network/fetchCommunities",
-  async () => get<Community[]>("/api/network/communities")
+  async () => get<Community[]>("/api/network/communities"),
 );
 
 export const fetchKeyPlayers = createAsyncThunk(
   "network/fetchKeyPlayers",
-  async () => get<KeyPlayers>("/api/network/keyplayers")
+  async () => get<KeyPlayers>("/api/network/keyplayers"),
 );
 
 export const fetchStatistics = createAsyncThunk(
   "network/fetchStatistics",
-  async () => get<NetworkStatistics>("/api/network/statistics")
+  async () => get<NetworkStatistics>("/api/network/statistics"),
 );
 
 export const findPath = createAsyncThunk(
   "network/findPath",
   async (payload: { from_id: string; to_id: string }) =>
-    post<PathResult>("/api/network/path", payload)
+    post<PathResult>("/api/network/path", payload),
 );
 
 const networkSlice = createSlice({
@@ -70,14 +74,19 @@ const networkSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchFullGraph.pending, (state) => {
+      .addCase(fetchFullGraph.pending, (state, action) => {
         state.loading = true;
+        state.error = null;
+        state.graphRequestId = action.meta.requestId;
       })
       .addCase(fetchFullGraph.fulfilled, (state, action) => {
+        if (state.graphRequestId !== action.meta.requestId) return;
         state.loading = false;
+        state.error = null;
         state.graph = action.payload;
       })
       .addCase(fetchFullGraph.rejected, (state, action) => {
+        if (state.graphRequestId !== action.meta.requestId) return;
         state.loading = false;
         state.error = action.error.message ?? "Failed to load network";
       })
@@ -90,8 +99,16 @@ const networkSlice = createSlice({
       .addCase(fetchStatistics.fulfilled, (state, action) => {
         state.statistics = action.payload;
       })
+      .addCase(findPath.pending, (state, action) => {
+        state.path = null;
+        state.pathRequestId = action.meta.requestId;
+      })
       .addCase(findPath.fulfilled, (state, action) => {
-        state.path = action.payload;
+        if (state.pathRequestId === action.meta.requestId)
+          state.path = action.payload;
+      })
+      .addCase(findPath.rejected, (state, action) => {
+        if (state.pathRequestId === action.meta.requestId) state.path = null;
       });
   },
 });

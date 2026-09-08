@@ -1,3 +1,4 @@
+import { IS_DEMO } from "@/config/runtime";
 /**
  * StatsCards — the four headline metric cards on the dashboard.
  * Dossier styling: serif numerals, mono captions, hairline rules.
@@ -8,7 +9,9 @@ import { RootState } from "@/store";
 import { formatNumber } from "@/utils/formatters";
 
 export default function StatsCards() {
-  const statistics = useSelector((state: RootState) => state.network.statistics);
+  const statistics = useSelector(
+    (state: RootState) => state.network.statistics,
+  );
   const alerts = useSelector((state: RootState) => state.alerts.active);
 
   const totalCriminals = statistics?.nodes?.person ?? 0;
@@ -23,7 +26,7 @@ export default function StatsCards() {
       icon: Users,
       accent: "text-seal",
       bar: "bg-seal",
-      sub: "criminals in the graph",
+      sub: IS_DEMO ? "fictional records in the graph" : "persons in the graph",
     },
     {
       label: "Investigations",
@@ -39,7 +42,7 @@ export default function StatsCards() {
       icon: BellRing,
       accent: "text-risk-critical",
       bar: "bg-risk-critical",
-      sub: "real-time feed",
+      sub: IS_DEMO ? "local demo events" : "real-time feed",
     },
     {
       label: "Network nodes",
