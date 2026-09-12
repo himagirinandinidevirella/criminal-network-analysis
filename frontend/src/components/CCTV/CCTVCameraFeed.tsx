@@ -15,6 +15,7 @@ import type {
 import type { CCTVRecording } from "@/utils/cctvRecordings";
 import { formatPlaybackTime } from "@/utils/cctvUtils";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
+import { usePersonDetection } from "@/hooks/usePersonDetection";
 import SimulatedCCTVFeed from "./SimulatedCCTVFeed";
 
 export interface CCTVFeedHandle {
@@ -37,6 +38,9 @@ interface Props {
   onTrack?: (id: string) => void;
   onReadyChange: (id: string, ready: boolean) => void;
   onDetection: (id: string, state: CameraDetectionState) => void;
+  personModel: any;
+  personThreshold: number;
+  onPersonDetection: (id: string, state: any) => void;
 }
 
 /** A stable, keyed media element per camera, preserved when switching between wall and focus. */
@@ -54,6 +58,9 @@ const CCTVCameraFeed = forwardRef<CCTVFeedHandle, Props>(
       onTrack,
       onReadyChange,
       onDetection,
+      personModel,
+      personThreshold,
+      onPersonDetection,
     },
     ref,
   ) {
@@ -73,6 +80,13 @@ const CCTVCameraFeed = forwardRef<CCTVFeedHandle, Props>(
       model.status === "ready" && Boolean(recording) && ready && !error,
       threshold,
       visible && inView,
+    );
+    const personDetection = usePersonDetection(
+      videoRef as any,
+      sourceKey,
+      personModel.status === "ready" && Boolean(recording) && ready && !error,
+      personThreshold,
+      visible && inView
     );
     const onReady = useCallback(() => {
       setReady(true);
@@ -111,6 +125,16 @@ const CCTVCameraFeed = forwardRef<CCTVFeedHandle, Props>(
       detection.frame,
       detection.error,
       onDetection,
+    ]);
+    useEffect(() => {
+      onPersonDetection(camera.id, personDetection);
+    }, [
+      camera.id,
+      personDetection.sourceKey,
+      personDetection.status,
+      personDetection.frame,
+      personDetection.error,
+      onPersonDetection,
     ]);
 
     useImperativeHandle(
@@ -160,6 +184,10 @@ const CCTVCameraFeed = forwardRef<CCTVFeedHandle, Props>(
     const frame =
       detection.frame && Math.abs(seconds - detection.frame.sourceTime) <= 1.2
         ? detection.frame
+        : null;
+    const personFrame =
+      personDetection.frame && Math.abs(seconds - personDetection.frame.sourceTime) <= 1.2
+        ? personDetection.frame
         : null;
     const aiLabel = !recording
       ? simulation
@@ -284,15 +312,15 @@ const CCTVCameraFeed = forwardRef<CCTVFeedHandle, Props>(
               )}
             </div>
           )}
-          {recording && frame && frame.boxes.length > 0 && (
+          {recording && ((frame && frame.boxes.length > 0) || (personFrame && personFrame.boxes.length > 0)) && (
             <svg
               className="pointer-events-none absolute inset-0 h-full w-full"
-              viewBox={`0 0 ${frame.width} ${frame.height}`}
+              viewBox={`0 0 ${frame?.width || personFrame?.width || 0} ${frame?.height || personFrame?.height || 0}`}
               preserveAspectRatio="xMidYMid meet"
-              aria-label={`Face detection overlay for ${camera.id}`}
+              aria-label={`Detection overlay for ${camera.id}`}
             >
-              {frame.boxes.map((box, index) => (
-                <g key={index}>
+              {frame && frame.boxes.map((box, index) => (
+                <g key={`face-${index}`}>
                   <title>{`Face detected, ${Math.round(box.confidence * 100)} percent confidence. No identity assigned.`}</title>
                   <rect
                     data-face-box="true"
@@ -315,6 +343,33 @@ const CCTVCameraFeed = forwardRef<CCTVFeedHandle, Props>(
                     fontFamily="monospace"
                     fontSize={Math.max(14, frame.width / 40)}
                   >{`Face ${Math.round(box.confidence * 100)}%`}</text>
+                </g>
+              ))}
+              
+              {personFrame && personFrame.boxes.map((box, index) => (
+                <g key={`person-${index}`}>
+                  <title>{`Person detected, ${Math.round(box.score * 100)} percent confidence.`}</title>
+                  <rect
+                    data-person-box="true"
+                    x={box.x}
+                    y={box.y}
+                    width={box.width}
+                    height={box.height}
+                    fill="none"
+                    stroke="#ed718d"
+                    strokeWidth="2"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <text
+                    x={box.x + 3}
+                    y={Math.max(18, box.y - 7)}
+                    fill="#ff90ab"
+                    stroke="#251015"
+                    strokeWidth="2"
+                    paintOrder="stroke"
+                    fontFamily="monospace"
+                    fontSize={Math.max(14, personFrame.width / 40)}
+                  >{`Person ${Math.round(box.score * 100)}%`}</text>
                 </g>
               ))}
             </svg>

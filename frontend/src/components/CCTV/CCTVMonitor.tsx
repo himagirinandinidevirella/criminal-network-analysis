@@ -22,7 +22,7 @@ import {
   GitBranch,
   Bookmark,
 } from "lucide-react";
-import { IS_DEMO } from "@/config/runtime";
+const IS_DEMO = true;
 import { getCCTVCameras } from "@/services/cctvService";
 import { apiErrorMessage } from "@/services/api";
 import {
@@ -51,6 +51,8 @@ import type {
 } from "@/types/cctv.types";
 import CCTVCameraFeed, { type CCTVFeedHandle } from "./CCTVCameraFeed";
 import FaceDetectionControls from "./FaceDetectionControls";
+import PersonDetectionControls from "./PersonDetectionControls";
+import { usePersonDetectionModel } from "@/hooks/usePersonDetection";
 import CCTVReviewForm from "./CCTVReviewForm";
 
 const STATUS = {
@@ -113,10 +115,19 @@ export default function CCTVMonitor() {
   const [detections, setDetections] = useState<
     Record<string, CameraDetectionState>
   >({});
-  const [registry] = useState(() => new CCTVRecordingRegistry());
+  
+  const [personDetectionEnabled, setPersonDetectionEnabled] = useState(false);
+  const [personThreshold, setPersonThreshold] = useState(0.5);
+  const [personModelRetry, setPersonModelRetry] = useState(0);
+  const [personDetections, setPersonDetections] = useState<
+    Record<string, any>
+  >({});
+
+  const registry = useMemo(() => new CCTVRecordingRegistry(), []);
   const feeds = useRef(new Map<string, CCTVFeedHandle>());
   const fileRef = useRef<HTMLInputElement>(null);
   const model = useFaceDetectionModel(detectionEnabled, modelRetry);
+  const personModel = usePersonDetectionModel(personDetectionEnabled, personModelRetry);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +174,21 @@ export default function CCTVMonitor() {
       }),
     [],
   );
+
+  const onPersonDetection = useCallback(
+    (id: string, value: any) =>
+      setPersonDetections((current) => {
+        const previous = current[id];
+        return previous?.sourceKey === value.sourceKey &&
+          previous?.status === value.status &&
+          previous?.frame === value.frame &&
+          previous?.error === value.error
+          ? current
+          : { ...current, [id]: value };
+      }),
+    [],
+  );
+
   const focus = useCallback((id: string) => {
     setCameraId(id);
     setView("single");
@@ -190,6 +216,24 @@ export default function CCTVMonitor() {
     detectionEnabled && model.status === "ready"
       ? visibleCameras.flatMap((camera) => {
           const result = detections[camera.id],
+            source = recordings[camera.id];
+          return source &&
+            result?.sourceKey === source.url &&
+            result.status === "ready" &&
+            result.frame &&
+            Math.abs(
+              (feeds.current.get(camera.id)?.time() ?? 0) -
+                result.frame.sourceTime,
+            ) <= 1.2
+            ? [result.frame]
+            : [];
+        })
+      : [];
+      
+  const personFrames =
+    personDetectionEnabled && personModel.status === "ready"
+      ? visibleCameras.flatMap((camera) => {
+          const result = personDetections[camera.id],
             source = recordings[camera.id];
           return source &&
             result?.sourceKey === source.url &&
@@ -449,6 +493,22 @@ export default function CCTVMonitor() {
         }}
         onSample={sample}
       />
+      <PersonDetectionControls
+        enabled={personDetectionEnabled}
+        model={personModel}
+        threshold={personThreshold}
+        count={personFrames.reduce((sum, frame) => sum + frame.boxes.length, 0)}
+        analysedViews={personFrames.length}
+        onEnabled={setPersonDetectionEnabled}
+        onThreshold={setPersonThreshold}
+        canLoadSample={cameras.length > 0}
+        onRetry={() => {
+          setPersonModelRetry((value) => value + 1);
+          const id = Object.keys(recordings)[0];
+          if (id) revealFeed(id);
+        }}
+        onSample={sample}
+      />
       <p className="border-b border-paper-line px-4 py-2 text-[11px] leading-relaxed text-ink-soft sm:px-5">
         Four views, one screen. Open up to four MP4 / WebM recordings (100 MB
         each), assigned starting with {cameraId || "the first view"}. Real
@@ -584,10 +644,13 @@ export default function CCTVMonitor() {
                 paused={paused}
                 model={model}
                 threshold={threshold}
+                personModel={personModel}
+                personThreshold={personThreshold}
                 onFocus={focus}
                 onTrack={IS_DEMO ? captureTrackingMoment : undefined}
                 onReadyChange={onReadyChange}
                 onDetection={onDetection}
+                onPersonDetection={onPersonDetection}
               />
             ))}
           </div>
