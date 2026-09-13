@@ -8,6 +8,7 @@ are created on first connection to keep queries fast.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Optional
 
@@ -88,20 +89,37 @@ def _ensure_indexes() -> None:
         logger.warning("Could not create Neo4j indexes: %s", exc)
 
 
+def _jsonify(value: Any) -> Any:
+    """Recursively convert values JSON/Pydantic cannot serialise (neo4j.time.*,
+    bytes, ...) to strings. Neo4j DateTime/Date/Time nodes break FastAPI
+    responses with 'Unable to serialize unknown type' otherwise."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {k: _jsonify(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonify(v) for v in value]
+    try:
+        json.dumps(value)
+        return value
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def run_query(query: str, parameters: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
-    """Execute a read query and return a list of record dicts."""
+    """Execute a read query and return a list of JSON-safe record dicts."""
     driver = get_driver()
     with driver.session(database=settings.neo4j_database) as session:
         result = session.run(query, parameters or {})
-        return [record.data() for record in result]
+        return [_jsonify(record.data()) for record in result]
 
 
 def run_write(query: str, parameters: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
-    """Execute a write query inside a transaction and return record dicts."""
+    """Execute a write query inside a transaction and return JSON-safe records."""
     driver = get_driver()
 
     def _work(tx: Any) -> list[dict[str, Any]]:
-        return [record.data() for record in tx.run(query, parameters or {})]
+        return [_jsonify(record.data()) for record in tx.run(query, parameters or {})]
 
     with driver.session(database=settings.neo4j_database) as session:
         return session.execute_write(_work)

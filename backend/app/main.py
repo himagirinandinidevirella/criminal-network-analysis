@@ -136,6 +136,15 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     _load_ml_models()
     _seed_data()
     _warmup_blockchain()
+    # Preload the local chatbot LLM in the background so the first chat message
+    # after a restart answers in ~8s instead of ~35s (frontend timeout is 30s).
+    try:
+        from app.services import llm_service
+        import threading as _threading
+
+        _threading.Thread(target=llm_service._load, daemon=True, name="llm-preload").start()
+    except Exception as exc:  # noqa: BLE001 - chatbot must not block startup
+        logger.warning("LLM preload skipped: %s", exc)
     logger.info("CrimeNet AI is ready")
     yield
     # Graceful shutdown

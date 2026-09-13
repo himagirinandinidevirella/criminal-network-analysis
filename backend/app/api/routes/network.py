@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.middleware.auth_middleware import get_current_user
 from app.api.routes import ok
+from app.database import neo4j_connection as neo
 from app.database.redis_connection import cache_get, cache_set, TTL
 from app.models.network_model import PathRequest, PredictLinksRequest, WhatIfRequest
 from app.services import graph_service
@@ -46,6 +47,40 @@ async def full_graph(
     )
     cache_set(cache_key, data, TTL["graph"])
     return ok(data)
+
+
+@router.get("/locations")
+async def locations(
+    crime_type: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Location hotspots for the crime map — one lightweight query instead of
+    pulling the whole graph, so the map renders in ~1s."""
+    if crime_type:
+        rows = neo.run_query(
+            """
+            MATCH (l:Location)<-[:LOCATED_AT]-(p:Person)
+            WHERE ANY(c IN coalesce(p.crime_types, [])
+                      WHERE toLower(c) CONTAINS toLower($ct))
+            RETURN properties(l) AS props, count(DISTINCT p) AS matched
+            """,
+            {"ct": crime_type},
+        )
+        items = []
+        for r in rows:
+            props = dict(r["props"])
+            props["crime_count"] = r["matched"]
+            items.append(props)
+    else:
+        rows = neo.run_query(
+            "MATCH (l:Location) RETURN properties(l) AS props ORDER BY l.crime_count DESC"
+        )
+        items = [r["props"] for r in rows]
+    max_count = max((i.get("crime_count") or 0) for i in items) if items else 0
+    for item in items:
+        count = item.get("crime_count") or 0
+        item["hotspot_score"] = round(count / max_count, 3) if max_count else 0.0
+    return ok(items)
 
 
 @router.get("/communities")

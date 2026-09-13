@@ -1,246 +1,216 @@
 # 🕸️ CrimeNet AI — AI-Powered Criminal Network Analysis System
 
-> **Try the standalone demo:** `bash start.sh --demo` (Node.js 20+).
-> Open the live preview / port 3000 and click **Explore demo**. No Docker,
-> database, API key or external model download is required.
+**Smart India Hackathon 2025 · Ministry of Home Affairs — India**
+
+> 🚨 **Interactive demo:** run `bash start.sh --demo` (Node.js 20+) → open
+> `http://localhost:3000` → click **Explore demo**. No Docker, database, API key
+> or model download needed — everything runs locally in your browser.
+> Full-stack mode (real Neo4j + local LLM) is documented below.
 >
-> This mode uses **synthetic browser-local data**. Its assistant and scores are
-> illustrative. CCTV includes a real, opt-in browser-local face detector (boxes
-> and counts only), while live camera feeds and blockchain are not connected.
-> See [DEMO_GUIDE.md](DEMO_GUIDE.md) for setup, working flows, limitations and tests.
-> The full-stack architecture described below is separate and requires its own
-> infrastructure and validation; it is not a claim of production readiness.
+> ⚠️ All people, relationships and scores are **synthetic**. For software
+> evaluation only.
 
-**Smart India Hackathon 2025** · Ministry of Home Affairs — India
+CrimeNet AI ingests police records (FIRs, CDRs, bank/UPI transactions, vehicle
+data), extracts entities with NLP, builds a **Neo4j criminal knowledge graph**,
+and applies **risk scoring, anomaly detection, crime prediction and a local
+LLM assistant** to help investigators see — and disrupt — entire networks
+instead of single suspects.
 
-CrimeNet AI is a full-stack intelligence platform that ingests police records
-(FIRs, CDRs, bank/UPI transactions, vehicle data), extracts entities with
-multilingual NLP, builds a **Neo4j knowledge graph**, and applies **Graph Neural
-Networks, XGBoost risk scoring, anomaly detection and crime prediction** to help
-investigators visualise and disrupt criminal networks.
+![Dashboard](docs/screenshots/dashboard.png)
 
 ---
 
-## 🎯 The 10-Step Workflow (SIH 2025 diagram)
+## ✨ Feature Matrix
 
-```
-DATA SOURCES → DATA COLLECTION → DATA PREPROCESSING → ENTITY EXTRACTION (NLP)
-→ GRAPH CREATION (Neo4j) → AI/ML MODELS → NETWORK ANALYSIS → VISUAL DASHBOARD
-→ INVESTIGATOR ACTION → REPORT GENERATION
-```
-
-| Step                    | Implementation                                                                                                                          |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Data Sources         | FIR text/PDF, CDR CSV, bank/UPI/crypto records, social/news, vehicle (RTO), court records                                               |
-| 2. Data Collection      | Bulk CSV/PDF/Excel/JSON import, REST upload endpoints, drag-and-drop UI, Kafka/WebSocket ingestion                                      |
-| 3. Preprocessing        | HTML strip, date/phone normalisation, Pydantic validation, dedup, imputation, geocoding                                                 |
-| 4. Entity Extraction    | `multilingual-bert-base-cased` + spaCy + regex → PERSON/LOCATION/VEHICLE/ACCOUNT/ORGANIZATION                                           |
-| 5. Graph Creation       | Neo4j nodes (Person, Vehicle, Account, Organization, Location, Transaction, CrimeEvent) + 12 relationship types                         |
-| 6. AI/ML Models         | NLP extractor, GraphSAGE GNN, XGBoost+SHAP risk scorer, Isolation Forest+LSTM anomaly detector, LSTM+RF crime predictor, link predictor |
-| 7. Network Analysis     | PageRank/centrality, Louvain communities, shortest paths, hidden-link prediction, what-if simulation                                    |
-| 8. Visual Dashboard     | Cytoscape network map, Recharts, Leaflet heatmap, risk panel, alert feed                                                                |
-| 9. Investigator Actions | Verify (badge + timestamp), notes (react-quill), evidence upload (chain of custody), flag/escalate                                      |
-| 10. Report Generation   | PDF (ReportLab), CSV, Excel (openpyxl), JSON + secure expiring share links                                                              |
+| Module | Highlights |
+|---|---|
+| 🔐 **Auth & Roles** | Admin · Senior Officer · Officer · Analyst — JWT, per-IP rate limiting, blockchain-backed audit trail |
+| 📊 **Dashboard** | Live network stats, case locations, real-time alert feed |
+| 🕸️ **Network Analysis** | Interactive Cytoscape graph (500 nodes) · **Path Finder** (shortest path ≤ 6 hops) · **Gang detection** (community detection) · **What-If arrest simulator** |
+| 🔎 **Investigation** | **FIR → knowledge graph**: paste raw FIR text, NLP extracts persons / vehicles / accounts / locations and writes them into the graph · intelligent multi-entity search · autonomous investigator |
+| 👤 **Criminal Profiles** | Explainable XGBoost risk score, recidivism & crime-type/location prediction, anomaly flags, timeline, analyst actions |
+| 🚨 **Alerts** | Real-time WebSocket alerts, rules engine, assign / escalate / resolve with history |
+| 🗺️ **Crime Map** | Leaflet hotspot map of 200+ locations with per-crime-type filtering |
+| 🤖 **AI Assistant** | Rule-based graph queries (instant) + **local LLM fallback** (Qwen2.5-1.5B, 4-bit GGUF, CPU-only, fully offline) |
+| ⛓️ **Integrity Lab** | SHA-256 evidence & report fingerprinting on a blockchain ledger, tamper detection, court-admissibility certificates |
+| 🧬 **Fingerprints** | AFIS-style biometric verification flow |
+| 🌐 **Cybercrime** | Phishing URL & crypto-wallet scanning, threat intel |
+| 📄 **Reports** | Watermarked PDF / CSV / Excel / JSON exports, public share links |
+| 🖥️ **CCTV** | Opt-in browser-local person detection (boxes & counts only) |
 
 ---
 
-## 🏗️ Tech Stack
+## 🏗️ Architecture
 
-**Frontend** — React 18 · TypeScript · Vite · TailwindCSS · Redux Toolkit ·
-Cytoscape.js · Recharts · Leaflet · D3 · Framer Motion · socket.io-client ·
-jsPDF · react-quill
+```mermaid
+flowchart LR
+    subgraph Client["🖥️ Frontend — React 18 + Vite + Tailwind"]
+        UI["Cytoscape graph · Leaflet map · Redux Toolkit"]
+    end
 
-**Backend** — FastAPI · Neo4j (graph) · PostgreSQL (audit/reports) · Redis (cache)
-· PyTorch Geometric (GraphSAGE) · Transformers (multilingual BERT) · XGBoost ·
-SHAP · scikit-learn · spaCy · NetworkX
+    subgraph API["⚙️ Backend — FastAPI (63+ endpoints)"]
+        AUTH["JWT auth · RBAC · rate limiter"]
+        ROUTES["Criminals · Network · Alerts · Reports\nChatbot · Cybercrime · Blockchain · Export"]
+        NLP["spaCy NLP\nFIR entity extraction"]
+        RISK["XGBoost risk · anomaly · predictions"]
+        LLM["🤖 Local LLM\nQwen2.5-1.5B (llama-cpp, CPU)"]
+    end
+
+    subgraph Data["💾 Data & Infrastructure"]
+        NEO[("Neo4j\nknowledge graph\n500+ nodes")]
+        PG[("PostgreSQL\nusers · audit logs")]
+        RD[("Redis\ncache · sessions")]
+        GAN[("Ganache\nblockchain ledger")]
+        IPFS[("IPFS\nevidence storage")]
+    end
+
+    UI -->|REST /api + WebSocket| AUTH
+    AUTH --> ROUTES
+    ROUTES --> NEO & PG & RD & GAN & IPFS
+    ROUTES --> NLP & RISK
+    ROUTES --> LLM
+```
+
+## 🔄 How an FIR becomes intelligence
+
+```mermaid
+sequenceDiagram
+    participant I as 👮 Investigator
+    participant F as Frontend
+    participant B as FastAPI
+    participant N as spaCy NLP
+    participant G as Neo4j Graph
+    participant L as 🤖 Local LLM
+
+    I->>F: paste raw FIR text → ANALYZE FIR
+    F->>B: POST /api/criminals/analyze-fir
+    B->>N: extract entities (persons, vehicles, accounts…)
+    N-->>B: structured entities
+    B->>G: MERGE persons / vehicles / locations + relationships
+    B-->>F: extraction result + linked records
+    Note over G: document becomes queryable network data
+    I->>F: "Connect Raja Khan and Vikram Rao"
+    F->>B: POST /api/chat/message
+    B->>G: shortestPath query (≤ 6 hops)
+    G-->>B: path (nodes + relationship types)
+    B-->>F: "Path: Raja Khan → … → Vikram Rao (n hops)"
+    Note over L: free-form questions fall back to the<br/>local Qwen2.5-1.5B model — 100% offline
+```
+
+## 🤖 AI Assistant routing
+
+```mermaid
+flowchart TD
+    Q["User message"] --> R{"Regex intent match?"}
+    R -->|"top risks / gangs / transactions /<br/>hotspots / associates / path / profile"| G["Neo4j Cypher query"]
+    G --> A["Instant structured answer"]
+    R -->|greeting| H["Instant greeting + suggestion chips"]
+    R -->|no match| L["🤖 Local Qwen2.5-1.5B LLM<br/>(llama-cpp-python, CPU, offline)"]
+    L -->|answer| A2["LLM reply — intent: llm"]
+    L -->|unavailable| C["Canned capability help"]
+```
+
+## 🕸️ Knowledge-graph schema
+
+```mermaid
+flowchart LR
+    P(["👤 Person"]) ---|KNOWS / ASSOCIATE| P
+    P ---|LOCATED_AT| L(["📍 Location"])
+    P ---|HAS_ACCOUNT| A(["🏦 Account"])
+    P ---|OWNS| V(["🚗 Vehicle"])
+    P ---|MEMBER_OF| O(["🏢 Organisation"])
+    P ---|COMMUNICATED_WITH| P
+    A ---|TRANSFERRED_TO| A
+```
 
 ---
 
-## 📁 Project Structure
+## 🚀 Quickstart
 
-```
-criminal-network-analysis/
-├── frontend/            React + TypeScript SPA
-│   ├── public/          index.html, favicon, logo, alert sound
-│   └── src/             components, pages, services, store, types, utils, hooks
-├── backend/             FastAPI application
-│   ├── app/
-│   │   ├── api/         routes + middleware
-│   │   ├── models/      Pydantic schemas
-│   │   ├── services/    graph, risk, anomaly, nlp, report, alert, export, share
-│   │   ├── database/    neo4j / postgres / redis connections
-│   │   ├── ml_models/   6 ML model modules
-│   │   └── websocket/   real-time alert manager
-│   ├── data/            synthetic data generator + sample FIRs (EN/HI)
-│   └── tests/           pytest suite
-├── docker-compose.yml   frontend, backend, neo4j, postgres, redis, nginx
-├── nginx.conf           reverse proxy (+ WebSocket, gzip, security headers)
-├── .env.example         configuration template
-└── start.sh             one-command bootstrap
-```
-
----
-
-## 🚀 Quick Start — browser-only demo
+### Option A — instant browser demo (no infrastructure)
 
 ```bash
-bash start.sh --demo
+bash start.sh --demo          # or: cd frontend && npm run demo
+# open http://localhost:3000 → "Explore demo"
 ```
 
-Or use npm directly (including on Windows):
+### Option B — full stack (real Neo4j + local LLM)
 
 ```bash
-cd frontend
-npm ci
-npm run demo
-```
+# 1. Data services
+docker compose up -d neo4j postgres redis ganache
 
-The demo includes 40 fictional people and 112 graph entities, working search and
-combined filters, shortest paths, non-destructive graph simulation, saved notes
-and review actions, local alert workflows, SHA-256 checks, and real
-PDF/CSV/XLSX/JSON report downloads. Public previews and report history are local
-to the current browser and origin. Reset data in Settings.
-
-The dashboard also includes **CCTV Monitor**: view up to four recordings together,
-switch to a single camera, and enable real on-device face detection with boxes,
-confidence scores and frame-level counts. Click **Try AI test clip** to verify
-it using a clearly labeled, AI-generated example. Download a combined PNG or
-save a manual review flag to Alerts. No live cameras, face identification,
-cross-camera identity tracking or automated crime classification are connected.
-See the CCTV section in [DEMO_GUIDE.md](DEMO_GUIDE.md).
-
-**Cross-camera tracking** also provides manual event trails: bookmark moments in
-different views, add operator notes, review/reorder the camera sequence, seek
-available source moments and export a JSON trail. These are explicit, unverified
-manual links—not automated identification or cross-camera person tracking.
-
-For a static build: `cd frontend && npm run build:demo`. For automated checks:
-`npm test` and `npm run test:e2e` from `frontend/` (install Playwright Chromium
-first). See [DEMO_GUIDE.md](DEMO_GUIDE.md) for the full walkthrough.
-
-**Fingerprint verification** includes two separate local tools: SHA-256 file
-comparison (reference hash or second file), and a consent-based device
-biometric/passkey demonstration using WebAuthn. The latter can use a device's
-fingerprint reader, Face ID or PIN; it does not match uploaded fingerprint scans
-or identify a person. Its browser-local public-key record is not production
-authentication. See [DEMO_GUIDE.md](DEMO_GUIDE.md) for hardware, new-tab and
-security-boundary details.
-
-### Full-stack startup — Docker
-
-The following starts the original backend/database stack, **not** the standalone
-demo. It requires separately configured services and dependencies.
-
-```bash
-# 1. Clone / copy this project
-# 2. (Optional) copy .env.example → .env and adjust secrets
-# 3. Start everything
-bash start.sh
-```
-
-The script boots the stack in order (infra → databases → backend → synthetic
-data → frontend + nginx) and prints access URLs.
-
-```
-✅ CrimeNet AI is running!
-   🌐 Dashboard:  http://localhost
-   📡 API Docs:   http://localhost:8000/docs
-   🕸️ Neo4j UI:   http://localhost:7474
-   ⚡ Health:     http://localhost:8000/health
-```
-
-### Demo accounts
-
-| Role           | Login                     | Password      |
-| -------------- | ------------------------- | ------------- |
-| Admin          | `admin@crimenet.gov.in`   | `Admin@123`   |
-| Officer        | `officer@crimenet.gov.in` | `Officer@123` |
-| Analyst        | `analyst@crimenet.gov.in` | `Analyst@123` |
-| Senior Officer | `senior@crimenet.gov.in`  | `Senior@123`  |
-
-Guest link: `/public/report/demo-token-2025`
-
-### 🎬 Guided tour (full-stack mode)
-
-For the standalone browser tour, use `bash start.sh --demo` and **Start guided
-walkthrough** instead; it describes only the available local features.
-
-In full-stack mode, the login page has a **DEMO MODE** button that auto-runs the ~5-minute guided
-tour from the SIH 2025 spec:
-
-1. Dashboard overview → 2. FIR auto-analysis (NLP) → 3. Network exploration →
-2. Risk & anomaly (SHAP) → 5. Predictions → 6. Live alert (flash + sound) →
-3. AI chatbot → 8. Report generation
-
-It logs in with the demo admin account, drives the app through every screen,
-fires a real WebSocket alert, and shows a narrated overlay with pause / skip /
-exit controls. Backend endpoint: `POST /api/demo/trigger-alert`.
-
-### 🚰 Streaming & background tasks (optional wiring)
-
-- `backend/app/services/streaming_service.py` — Apache Kafka ingestion
-  (CDR / transactions / FIR) with automatic deduplication; degrades to an
-  in-process pub/sub bus when no broker is present. Set `KAFKA_BOOTSTRAP_SERVERS`
-  and add a `kafka` service to `docker-compose.yml` to enable.
-- `backend/app/services/tasks.py` — Celery tasks for async report generation
-  and nightly PageRank/centrality pre-computation. Set `CELERY_BROKER_URL` and
-  run `celery -A app.services.tasks worker` to enable; `run_task()` falls back
-  to inline execution otherwise.
-
-### Manual startup (without start.sh)
-
-```bash
-docker compose up -d neo4j postgres redis
-sleep 30
-docker compose up -d backend
-docker compose exec backend python data/synthetic_data_generator.py
-docker compose up -d frontend nginx
-```
-
----
-
-## 🧠 Synthetic Dataset — "Operation Mumbai"
-
-The seed script (`backend/data/synthetic_data_generator.py`) generates a
-realistic, reproducible Indian criminal network:
-
-- **500 criminals** (Indian names), **50 organizations**, **200 locations**
-- **~2,000 relationships**, **1,000 financial transactions** (with anomalies),
-  **500 CDR records** (with pre-crime spikes), **100 crime events**, **50
-  vehicles**, **100 bank accounts** (30 flagged)
-- Core characters: **Raja Khan** (boss, risk 95), **Shyam Verma** & **Meena
-  Patil** (lieutenants), **Vikram Rao** (Eastern Syndicate), **Priya Hacker**
-  (Dark Web Cell), plus a hidden cross-network link.
-
----
-
-## 🔐 Security & Access Control
-
-- **JWT** — 15-min access / 7-day refresh tokens (python-jose)
-- **Bcrypt** password hashing (12 rounds)
-- **Rate limiting** — 100 req/min per user (Redis counters)
-- **IP lockout** after 5 failed logins
-- **Full audit trail** — every mutating request logged to PostgreSQL
-- **Role-based access** — ADMIN / SENIOR_OFFICER / OFFICER / ANALYST / VIEWER
-- **Security headers** — HSTS, CSP-ready, X-Frame-Options, nosniff
-- **Secure sharing** — expiring tokens (24h/7d/30d), View vs Download, access
-  counting, revocable
-- **Parameterised queries** everywhere (SQL-injection safe)
-
----
-
-## 🧪 Tests
-
-```bash
+# 2. Backend  (Python 3.11+)
 cd backend
+python -m venv venv && venv\Scripts\activate     # Windows
 pip install -r requirements.txt
-pytest                              # unit + logic tests (no DB required)
-pytest -m integration               # requires the full stack
+set ML_LOAD_MODELS=false
+uvicorn app.main:app --port 8000
+
+# 3. Frontend
+cd frontend && npm install && npm run dev
+# open http://localhost:3000
+```
+
+**Demo accounts**
+
+| Role | Badge / login | Password |
+|---|---|---|
+| Admin | `admin@crimenet.gov.in` | `Admin@123` |
+| Officer | `officer@crimenet.gov.in` | `Officer@123` |
+| Analyst | `analyst@crimenet.gov.in` | `Analyst@123` |
+| Senior Officer | `senior@crimenet.gov.in` | `Senior@123` |
+
+### Optional — local LLM assistant
+
+```bash
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+# drop any chat GGUF into backend/data/models/llm/ (e.g. Qwen2.5-1.5B-Instruct Q4_K_M, ~986 MB)
+# it loads in the background at startup; ~1 GB RAM, CPU-only, fully offline
 ```
 
 ---
 
-## 📄 License
+## 🖼️ Screenshots
 
-This project was built as a Smart India Hackathon 2025 submission. All data is
-synthetic and generated for demonstration purposes only.
+| | |
+|---|---|
+| ![Network Analysis](docs/screenshots/network-analysis.png) | ![Path Finder](docs/screenshots/path-finder.png) |
+| *Interactive network graph* | *Path Finder: Raja Khan ⇄ Vikram Rao* |
+| ![FIR analysis](docs/screenshots/fir-analysis.png) | ![AI Assistant](docs/screenshots/ai-assistant-llm.png) |
+| *FIR → knowledge-graph extraction* | *Local-LLM assistant answer* |
+| ![Crime map](docs/screenshots/crime-map.png) | ![AI intent](docs/screenshots/ai-assistant-intent.png) |
+| *Geographic crime hotspots* | *Rule-based graph queries* |
+
+---
+
+## 🧪 Testing
+
+- **API sweep** — 63 endpoints across 14 route groups (auth, criminals,
+  network, alerts, chat, search, reports, export, cybercrime, blockchain,
+  actions, demo): **all green**.
+- **Playwright UI sweep** — `backend/ui_sweep.py` drives every page in real
+  Chromium, capturing console errors, page errors and failed requests
+  (screenshots in `backend/ui_sweep_shots/`). **4 role logins, 13 pages,
+  0 errors.**
+- Path Finder, FIR extraction, chat intents and LLM answers are exercised
+  end-to-end through the real UI on every run.
+
+## 📚 Documentation
+
+- [DEMO_VIDEO_SCRIPT.md](DEMO_VIDEO_SCRIPT.md) — timed 5-minute video walkthrough
+- [DEMO_GUIDE.md](DEMO_GUIDE.md) — browser demo guide & limitations
+- [PROJECT_EXPLANATION.md](PROJECT_EXPLANATION.md) — architecture deep-dive
+- [FEATURE_CHECK.md](FEATURE_CHECK.md) — feature verification matrix
+
+## 🛠️ Tech stack
+
+`React 18` · `Vite` · `Tailwind CSS` · `Redux Toolkit` · `Cytoscape.js` ·
+`Leaflet` · `FastAPI` · `llama-cpp-python` · `spaCy` · `XGBoost` · `scikit-learn` ·
+`Neo4j` · `PostgreSQL` · `Redis` · `Ganache` · `IPFS` · `Playwright` · `Docker Compose`
+
+---
+
+> ⚠️ **Disclaimer** — CrimeNet AI is a hackathon prototype operating entirely
+> on synthetic data. It is not connected to any real police database and makes
+> no claims of production readiness or investigative accuracy.

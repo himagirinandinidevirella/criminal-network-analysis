@@ -63,11 +63,13 @@ export default function InvestigatorChatbot() {
     setInput("");
     setTyping(true);
     try {
+      // Local-LLM answers can take 30-45s on CPU; the 30s axios default
+      // aborts mid-generation and shows "couldn't reach the analysis engine".
       const res = await post<ChatResponse>("/api/chat/message", {
         message: content,
         session_id: sessionId,
         context: [],
-      });
+      }, { timeout: 120000 });
       setMessages((m) => [
         ...m,
         {

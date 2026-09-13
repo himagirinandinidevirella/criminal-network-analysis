@@ -7,6 +7,8 @@ GET  /api/chat/history/{session_id} — conversation history
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import re
 from datetime import datetime, timezone
@@ -32,6 +34,21 @@ class ChatMessage(BaseModel):
 
 
 # ── Intent handlers ───────────────────────────────────────────────────────────
+def _jsonify(obj: Any) -> Any:
+    """Recursively convert Neo4j/other non-JSON-safe values (DateTime etc.)."""
+    if isinstance(obj, dict):
+        return {k: _jsonify(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonify(v) for v in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    try:
+        json.dumps(obj)
+        return obj
+    except (TypeError, ValueError):
+        return str(obj)
+
+
 def _extract_name(text: str) -> Optional[str]:
     """Pull a likely person name out of a query by matching known persons."""
     known = neo.run_query("MATCH (p:Person) RETURN p.name AS name LIMIT 5000")
@@ -86,9 +103,10 @@ def _top_associates(name: str) -> tuple[str, list[dict[str, Any]], list[str]]:
 def _top_risks() -> tuple[str, list[dict[str, Any]], list[str]]:
     """Return the top 5 highest-risk criminals."""
     rows = neo.run_query(
-        "MATCH (p:Person) RETURN properties(p) AS props ORDER BY p.risk_score DESC LIMIT 5"
+        "MATCH (p:Person) WHERE p.risk_score IS NOT NULL RETURN properties(p) AS props "
+        "ORDER BY p.risk_score DESC LIMIT 5"
     )
-    items = [r["props"] for r in rows]
+    items = [_jsonify(r["props"]) for r in rows]
     text = "Top 5 highest-risk individuals:\n" + "\n".join(
         f"{i+1}. {p.get('name')} — {p.get('risk_score')}/100 ({', '.join(p.get('crime_types') or []) or 'unknown'})"
         for i, p in enumerate(items)
@@ -123,7 +141,7 @@ def _suspicious_transactions() -> tuple[str, list[dict[str, Any]], list[str]]:
         RETURN properties(a) AS props ORDER BY a.total_suspicious_amount DESC LIMIT 5
         """
     )
-    items = [r["props"] for r in rows]
+    items = [_jsonify(r["props"]) for r in rows]
     if not items:
         return "No flagged accounts found.", [], []
     text = "Top flagged accounts:\n" + "\n".join(
@@ -138,7 +156,7 @@ def _crime_hotspots() -> tuple[str, list[dict[str, Any]], list[str]]:
     rows = neo.run_query(
         "MATCH (l:Location) RETURN properties(l) AS props ORDER BY l.hotspot_score DESC LIMIT 5"
     )
-    items = [r["props"] for r in rows]
+    items = [_jsonify(r["props"]) for r in rows]
     text = "Top crime hotspots:\n" + "\n".join(
         f"{i+1}. {l.get('name')} — hotspot score {l.get('hotspot_score', 0)}"
         for i, l in enumerate(items)
@@ -165,6 +183,7 @@ def _profile(name: str) -> tuple[str, list[dict[str, Any]], list[str]]:
     person = _find_person(name)
     if not person:
         return f"No profile found for '{name}'.", [], []
+    person = _jsonify(person)
     risk = risk_service.score_criminal(person["id"])
     text = (
         f"Profile: {person.get('name')} ({person.get('criminal_id')})\n"
@@ -175,14 +194,14 @@ def _profile(name: str) -> tuple[str, list[dict[str, Any]], list[str]]:
     return text, person, ["View Full Profile", "Generate Report"]
 
 
-# Intent routing table: (regex, handler_name)
+# Intent routing table: (regex, handler_name) — most specific first so generic
+# patterns (e.g. "top 5") cannot shadow concrete ones (e.g. "highest risk").
 INTENTS = [
-    (r"connect|path between|link between", "connect"),
-    (r"associate|connection|top 5|network of|who are", "associates"),
-    (r"top risk|most dangerous|highest risk|most wanted", "top_risks"),
+    (r"top risk|most dangerous|highest risk|most wanted|top \d+ risk", "top_risks"),
     (r"suspicious|transaction|money|financial|account", "transactions"),
     (r"crime in|hotspot|location|where", "hotspots"),
     (r"gang|community|network$", "gangs"),
+    (r"associate|connection of|network of|who are|top \d+ associate", "associates"),
     (r"profile|who is", "profile"),
 ]
 
@@ -224,6 +243,33 @@ def _answer(message: str) -> dict[str, Any]:
             return {"response": reply, "data": data, "follow_ups": followups,
                     "intent": intent}
 
+    # Greetings: answer instantly instead of paying the local-LLM latency.
+    if re.match(r"^\s*(hi|hii+|hello|hey|good\s+(morning|afternoon|evening))\b", lower):
+        return {
+            "response": (
+                "Hello! I'm the CrimeNet assistant. Ask me about the network, e.g.:\n"
+                "• \"Top 5 highest risk criminals\"\n"
+                "• \"Who are Raja Khan's associates?\"\n"
+                "• \"Connect Raja Khan and Vikram Rao\""
+            ),
+            "data": None,
+            "follow_ups": ["Top 5 highest risk criminals", "Detected gangs",
+                           "Suspicious transactions"],
+            "intent": "greeting",
+        }
+
+    # Free-form question: try the local LLM before falling back to canned help.
+    from app.services import llm_service
+
+    llm_reply = llm_service.generate(text)
+    if llm_reply:
+        return {
+            "response": llm_reply,
+            "data": None,
+            "follow_ups": ["Top 5 highest risk", "Detected gangs", "Suspicious transactions"],
+            "intent": "llm",
+        }
+
     return {
         "response": (
             "I can help you with:\n"
@@ -244,7 +290,8 @@ def _answer(message: str) -> dict[str, Any]:
 @router.post("/message")
 async def message(body: ChatMessage, user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     """Process a natural-language query and return a structured response."""
-    result = _answer(body.message)
+    # Off-loop: the LLM fallback and Neo4j queries are blocking CPU/IO work.
+    result = await asyncio.to_thread(_answer, body.message)
     result["timestamp"] = datetime.now(timezone.utc).isoformat()
     # Persist conversation in Redis for history retrieval.
     session_id = body.session_id or str(user.get("sub"))

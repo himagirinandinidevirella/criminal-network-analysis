@@ -24,8 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Download spaCy language model used by the NLP entity extractor
-RUN python -m spacy download en_core_web_sm
+# Install the spaCy language model used by the NLP entity extractor.
+# Pull the official release asset directly with pip (avoids `spacy download`,
+# which builds a malformed URL with an empty version segment, and PyPI, where
+# en_core_web_sm==3.6.0 is not published).
+RUN python -m pip install --no-cache-dir "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.0/en_core_web_sm-3.6.0.tar.gz"
 
 # Copy application source
 COPY . .

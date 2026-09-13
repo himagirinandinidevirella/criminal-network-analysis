@@ -68,3 +68,12 @@ backend/.env
 blockchain/secrets.json
 frontend/test-results/
 frontend/playwright-report/
+
+# Local LLM weights & test artifacts (too large / generated)
+backend.zip
+*.gguf
+backend/data/models/llm/
+backend/data/reports/
+backend/ui_sweep_shots/
+backend/ui_sweep_report.json
+ms-playwright/

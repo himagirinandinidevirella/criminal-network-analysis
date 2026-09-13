@@ -43,7 +43,8 @@ def get_redis() -> redis.Redis:
         _client = redis.Redis.from_url(
             settings.redis_url,
             decode_responses=True,
-            socket_connect_timeout=5,
+            socket_connect_timeout=2,
+            socket_timeout=2,
         )
         logger.info("Redis client created: %s", settings.redis_url)
     return _client

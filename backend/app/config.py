@@ -64,6 +64,10 @@ class Settings:
             "POSTGRES_URL",
             "postgresql://postgres:crimenet@localhost:5432/crimenetdb",
         )
+        # Bound connection attempts so an unreachable database cannot stall requests.
+        if "connect_timeout" not in self.postgres_url:
+            sep = "&" if "?" in self.postgres_url else "?"
+            self.postgres_url = f"{self.postgres_url}{sep}connect_timeout=3"
 
         # ── Redis ──────────────────────────────────────────────────────
         self.redis_url: str = _env("REDIS_URL", "redis://localhost:6379/0")

@@ -48,7 +48,10 @@ kafka-python==2.0.2
 celery==5.3.1
 
 # ── Config ───────────────────────────────────────────────────
-pydantic==2.0.0
+# Pinned to the latest 1.x: spaCy 3.6.0 requires pydantic<2.0.0, while
+# FastAPI 0.100.0 accepts pydantic>=1.7.4,<3.0.0 (v1 or v2). 2.0.3 conflicts
+# with spaCy, so we stay on the newest compatible 1.x line.
+pydantic==1.10.13
 python-dotenv==1.0.0
 
 # ── Blockchain & cybersecurity ───────────────────────────────

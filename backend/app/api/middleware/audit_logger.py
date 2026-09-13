@@ -91,11 +91,16 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                     user_id = payload.get("sub")
                 except Exception:  # noqa: BLE001
                     pass
-            log_action(
-                action=f"{request.method} {path}",
-                user={"sub": user_id} if user_id else None,
-                target_id=path,
-                target_type="HTTP",
-                ip_address=ip,
+            # Audit writes touch Postgres/blockchain synchronously; run them off
+            # the request path so slow or unavailable backends cannot stall responses.
+            asyncio.get_running_loop().create_task(
+                asyncio.to_thread(
+                    log_action,
+                    action=f"{request.method} {path}",
+                    user={"sub": user_id} if user_id else None,
+                    target_id=path,
+                    target_type="HTTP",
+                    ip_address=ip,
+                )
             )
         return response

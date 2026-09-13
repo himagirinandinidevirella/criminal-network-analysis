@@ -9,6 +9,7 @@ GET  /api/auth/me       — current user profile + permissions
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -198,7 +199,11 @@ async def login(request: Request, body: LoginRequest) -> dict[str, Any]:
 
     from app.api.middleware.audit_logger import log_action
 
-    log_action("LOGIN", user={"sub": str(user["id"])}, ip_address=ip)
+    # Audit logging touches Postgres/blockchain; run it off the request path so a
+    # slow or unavailable backend cannot delay the login response.
+    asyncio.create_task(
+        asyncio.to_thread(log_action, "LOGIN", user={"sub": str(user["id"])}, ip_address=ip)
+    )
     return ok(
         {
             "access_token": access_token,
